@@ -1221,6 +1221,52 @@ async def import_url(url: str = Form(...)):
 
 
 # ── NiceMeet BNI連携 ─────────────────────────────────────
+@app.post("/api/nicemeet-contact")
+async def nicemeet_contact(request: Request):
+    secret = request.headers.get("x-nicemeet-secret", "")
+    expected = os.environ.get("NICEMEET_WEBHOOK_SECRET", "nicemeet-bni-2026")
+    if secret != expected:
+        raise HTTPException(403, detail="forbidden")
+    data = await request.json()
+    bni_user = data.get("bni_user", "")
+    name = (data.get("name") or "").strip()
+    email = (data.get("email") or "").strip()
+    if not bni_user or not name or not email:
+        raise HTTPException(400, detail="missing fields")
+    is_bni = bool(data.get("is_bni_member", True))
+    category = (data.get("category") or "").strip()
+    chapter = (data.get("chapter") or "").strip()
+    conn = get_db()
+    user = conn.execute("SELECT id FROM users WHERE username=?", (bni_user,)).fetchone()
+    if not user:
+        conn.close()
+        raise HTTPException(404, detail="user not found")
+    uid = user["id"]
+    existing = conn.execute(
+        "SELECT id FROM contacts WHERE user_id=? AND (name=? OR introduction LIKE ?)",
+        (uid, name, f"%{email}%")
+    ).fetchone()
+    if existing:
+        conn.execute("""
+            UPDATE contacts SET
+                category=CASE WHEN category='' OR category IS NULL THEN ? ELSE category END,
+                chapter=CASE WHEN chapter='' OR chapter IS NULL THEN ? ELSE chapter END,
+                introduction=CASE WHEN introduction='' OR introduction IS NULL THEN ? ELSE introduction END,
+                updated_at=datetime('now','localtime')
+            WHERE id=?
+        """, (category, chapter, email, existing["id"]))
+        conn.commit()
+        conn.close()
+        return {"ok": True, "action": "updated", "id": existing["id"]}
+    conn.execute("""
+        INSERT INTO contacts (user_id, name, category, chapter, introduction)
+        VALUES (?, ?, ?, ?, ?)
+    """, (uid, name, category, chapter, email))
+    conn.commit()
+    new_id = conn.execute("SELECT last_insert_rowid() as id").fetchone()["id"]
+    conn.close()
+    return {"ok": True, "action": "created", "id": new_id}
+
 @app.post("/api/nicemeet-webhook")
 async def nicemeet_webhook(request: Request):
     secret = request.headers.get("x-nicemeet-secret", "")
