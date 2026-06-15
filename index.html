@@ -6,6 +6,9 @@
 <title>BNI Manager</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
+  .nav-btn { color: rgba(255,255,255,0.75); transition: all .15s; }
+  .nav-btn:hover { background: rgba(255,255,255,0.15); color: #fff; }
+  .nav-active { background: rgba(255,255,255,0.2) !important; color: #fff !important; font-weight:600; }
   .tab-active { border-bottom: 2px solid #2563eb; color: #2563eb; font-weight:600; }
   .tab-btn { padding: 8px 14px; font-size:14px; cursor:pointer; color:#6b7280; white-space:nowrap; }
   .tab-btn:hover { color:#2563eb; }
@@ -18,19 +21,168 @@
 </head>
 <body class="bg-gray-50 h-screen flex flex-col">
 
+<!-- Login Screen -->
+<div id="loginScreen" class="fixed inset-0 bg-blue-700 flex items-center justify-center z-[100]">
+  <div class="bg-white rounded-2xl shadow-2xl p-8 w-80">
+    <h1 class="text-2xl font-bold text-center text-blue-700 mb-1">BNI Manager</h1>
+    <p class="text-xs text-center text-gray-400 mb-5">CONNECT & RECORD & SEARCH</p>
+
+    <!-- Login Form -->
+    <div id="loginForm" class="space-y-3">
+      <input id="loginUsername" type="text" placeholder="ユーザー名" class="w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+      <input id="loginPassword" type="password" placeholder="パスワード" class="w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" onkeydown="if(event.key==='Enter')doLogin()">
+      <div id="loginError" class="text-red-500 text-xs hidden"></div>
+      <button onclick="doLogin()" class="w-full bg-blue-600 text-white font-semibold py-2.5 rounded-lg hover:bg-blue-700">ログイン</button>
+      <button onclick="showRegister()" class="w-full text-blue-600 text-sm hover:underline">新規アカウントを作成</button>
+    </div>
+
+    <!-- Register Form -->
+    <div id="registerForm" class="space-y-3 hidden">
+      <p class="text-sm font-semibold text-gray-700">新規アカウント作成</p>
+      <input id="regUsername" type="text" placeholder="ユーザー名（半角英数字）" class="w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+      <input id="regDisplayName" type="text" placeholder="表示名（例：片桐健治）" class="w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+      <input id="regPassword" type="password" placeholder="パスワード（6文字以上）" class="w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+      <div id="regError" class="text-red-500 text-xs hidden"></div>
+      <button onclick="doRegister()" class="w-full bg-green-600 text-white font-semibold py-2.5 rounded-lg hover:bg-green-700">アカウント作成</button>
+      <button onclick="showLogin()" class="w-full text-gray-500 text-sm hover:underline">ログインに戻る</button>
+    </div>
+  </div>
+</div>
+
 <!-- Header -->
-<header class="bg-blue-600 text-white px-4 py-3 flex items-center justify-between shadow">
+<header class="bg-blue-600 text-white px-4 py-2.5 flex items-center justify-between shadow">
   <div class="flex items-center gap-3">
     <button id="backBtn" class="md:hidden text-white text-xl hidden" onclick="showList()">←</button>
     <h1 class="font-bold text-lg">BNI Manager</h1>
   </div>
-  <div class="flex gap-2">
-    <button onclick="openImportModal()" class="bg-blue-500 hover:bg-blue-400 text-white font-semibold text-sm px-3 py-1.5 rounded-lg">📥 取込</button>
-    <button onclick="openAddModal()" class="bg-white text-blue-600 font-semibold text-sm px-3 py-1.5 rounded-lg">+ 追加</button>
+  <div class="flex items-center gap-2">
+    <nav class="hidden md:flex gap-1 text-sm">
+      <button onclick="switchView('contacts')" id="nav-contacts" class="nav-btn nav-active px-3 py-1.5 rounded-lg">👥 1to1リスト</button>
+      <button onclick="switchView('dashboard')" id="nav-dashboard" class="nav-btn px-3 py-1.5 rounded-lg">📊 ダッシュボード</button>
+      <button onclick="switchView('calendar')" id="nav-calendar" class="nav-btn px-3 py-1.5 rounded-lg">📅 カレンダー</button>
+      <button onclick="switchView('myprofile')" id="nav-myprofile" class="nav-btn px-3 py-1.5 rounded-lg">👤 マイプロフィール</button>
+      <button onclick="switchView('settings')" id="nav-settings" class="nav-btn px-3 py-1.5 rounded-lg">⚙ 設定</button>
+    </nav>
+    <button onclick="openImportModal()" id="btn-import" class="bg-blue-500 hover:bg-blue-400 text-white font-semibold text-sm px-3 py-1.5 rounded-lg">📥 取込</button>
+    <button onclick="openAddModal()" id="btn-add" class="bg-white text-blue-600 font-semibold text-sm px-3 py-1.5 rounded-lg">+ 追加</button>
+    <button onclick="doLogout()" class="text-blue-200 hover:text-white text-sm px-2 py-1.5">ログアウト</button>
   </div>
 </header>
 
-<div class="flex flex-1 overflow-hidden">
+<!-- Dashboard View -->
+<div id="view-dashboard" class="hidden flex-1 overflow-y-auto p-6 bg-gray-50">
+  <h2 class="text-xl font-bold text-gray-800 mb-5">ダッシュボード</h2>
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+    <div class="bg-white rounded-xl shadow p-4 text-center"><div class="text-3xl font-bold text-blue-600" id="d-total">-</div><div class="text-xs text-gray-500 mt-1">総1to1数</div></div>
+    <div class="bg-white rounded-xl shadow p-4 text-center"><div class="text-3xl font-bold text-orange-500" id="d-reminders">-</div><div class="text-xs text-gray-500 mt-1">リマインダー数</div></div>
+    <div class="bg-white rounded-xl shadow p-4 text-center"><div class="text-3xl font-bold text-green-600" id="d-chapters">-</div><div class="text-xs text-gray-500 mt-1">チャプター数</div></div>
+    <div class="bg-white rounded-xl shadow p-4 text-center"><div class="text-3xl font-bold text-purple-600" id="d-month">-</div><div class="text-xs text-gray-500 mt-1">今月の1to1</div></div>
+  </div>
+  <div class="grid md:grid-cols-2 gap-4">
+    <div class="bg-white rounded-xl shadow p-4">
+      <h3 class="font-bold text-gray-700 mb-3 text-sm">月別1to1実施数</h3>
+      <div id="d-chart" class="flex items-end gap-1.5 h-32"></div>
+    </div>
+    <div class="bg-white rounded-xl shadow p-4">
+      <h3 class="font-bold text-gray-700 mb-3 text-sm">直近のリマインダー</h3>
+      <div id="d-upcoming" class="space-y-2 text-sm"></div>
+    </div>
+  </div>
+  <div class="bg-white rounded-xl shadow p-4 mt-4">
+    <h3 class="font-bold text-gray-700 mb-3 text-sm">📅 次の1on1候補（優先度順）</h3>
+    <div id="d-suggestions" class="space-y-2"></div>
+  </div>
+</div>
+
+<!-- Calendar View -->
+<div id="view-calendar" class="hidden flex-1 overflow-y-auto p-4 bg-gray-50">
+  <div class="max-w-2xl mx-auto">
+    <div class="flex items-center justify-between mb-4">
+      <button onclick="calPrev()" class="text-gray-500 hover:text-gray-800 px-3 py-1.5 rounded-lg hover:bg-gray-200 text-lg">‹</button>
+      <h2 id="cal-title" class="text-lg font-bold text-gray-800"></h2>
+      <button onclick="calNext()" class="text-gray-500 hover:text-gray-800 px-3 py-1.5 rounded-lg hover:bg-gray-200 text-lg">›</button>
+    </div>
+    <div class="flex gap-3 mb-3 text-xs flex-wrap">
+      <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-blue-500 inline-block"></span>リマインダー</span>
+      <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-green-500 inline-block"></span>1on1実施</span>
+      <span id="cal-gcal-legend" class="items-center gap-1 hidden"><span class="w-3 h-3 rounded-full bg-orange-400 inline-block"></span>Googleカレンダー</span>
+    </div>
+    <div class="bg-white rounded-xl shadow overflow-hidden">
+      <div class="grid grid-cols-7 text-center text-xs font-semibold text-gray-500 border-b">
+        <div class="py-2">日</div><div class="py-2">月</div><div class="py-2">火</div>
+        <div class="py-2">水</div><div class="py-2">木</div><div class="py-2">金</div>
+        <div class="py-2 text-blue-400">土</div>
+      </div>
+      <div id="cal-grid" class="grid grid-cols-7"></div>
+    </div>
+    <div id="cal-detail" class="mt-4 hidden">
+      <div class="bg-white rounded-xl shadow p-4">
+        <h3 id="cal-detail-date" class="font-bold text-gray-700 mb-3 text-sm"></h3>
+        <div id="cal-detail-content" class="space-y-2"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- My Profile View -->
+<div id="view-myprofile" class="hidden flex-1 overflow-y-auto p-6 bg-gray-50">
+  <div class="max-w-2xl mx-auto">
+    <div class="flex items-center justify-between mb-5">
+      <h2 class="text-xl font-bold text-gray-800">マイプロフィール</h2>
+      <button onclick="saveMyProfile()" class="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700 font-semibold">保存</button>
+    </div>
+    <div class="bg-white rounded-xl shadow p-5 space-y-4">
+      <div class="grid grid-cols-2 gap-3">
+        <div class="col-span-2"><label class="text-xs font-semibold text-gray-500">名前</label><input id="mp_name" type="text" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></div>
+        <div><label class="text-xs font-semibold text-gray-500">会社名・屋号</label><input id="mp_company" type="text" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></div>
+        <div><label class="text-xs font-semibold text-gray-500">チャプター</label><input id="mp_chapter" type="text" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></div>
+        <div class="col-span-2"><label class="text-xs font-semibold text-gray-500">職種・カテゴリー</label><input id="mp_category" type="text" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></div>
+      </div>
+      <div><label class="text-xs font-semibold text-gray-500">事業内容</label><textarea id="mp_business_description" rows="3" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></textarea></div>
+      <div><label class="text-xs font-semibold text-gray-500">独自の強み</label><textarea id="mp_selling_points" rows="3" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></textarea></div>
+      <div><label class="text-xs font-semibold text-gray-500">ターゲット顧客</label><textarea id="mp_target_customers" rows="3" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></textarea></div>
+      <div><label class="text-xs font-semibold text-gray-500">紹介の切り出し方</label><textarea id="mp_referral_intro" rows="3" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></textarea></div>
+      <hr>
+      <div class="flex items-center gap-3">
+        <div class="flex-1"><label class="text-xs font-semibold text-gray-500">公開URL スラッグ</label><div class="flex items-center gap-1 mt-1"><span class="text-xs text-gray-400">/bni/profile/</span><input id="mp_slug" type="text" placeholder="my-name" class="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></div></div>
+        <div class="pt-5"><label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" id="mp_public" class="w-4 h-4 accent-blue-600"><span class="text-sm text-gray-700">公開する</span></label></div>
+      </div>
+      <div id="mp_public_url" class="text-xs text-blue-600 hidden"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Settings View -->
+<div id="view-settings" class="hidden flex-1 overflow-y-auto p-6 bg-gray-50">
+  <div class="max-w-md mx-auto space-y-5">
+    <h2 class="text-xl font-bold text-gray-800">アカウント設定</h2>
+    <div class="bg-white rounded-xl shadow p-5 space-y-4">
+      <h3 class="font-bold text-gray-700">パスワード変更</h3>
+      <input id="s_current_pw" type="password" placeholder="現在のパスワード" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+      <input id="s_new_pw" type="password" placeholder="新しいパスワード（8文字以上）" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+      <input id="s_new_pw2" type="password" placeholder="新しいパスワード（確認）" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+      <div id="s_pw_msg" class="text-sm hidden"></div>
+      <button onclick="changePassword()" class="w-full bg-blue-600 text-white font-semibold py-2 rounded-lg hover:bg-blue-700">パスワードを変更</button>
+    </div>
+    <div class="bg-white rounded-xl shadow p-5 space-y-3">
+      <h3 class="font-bold text-gray-700">🗓 Googleカレンダー連携</h3>
+      <p class="text-xs text-gray-500">連携するとリマインダー追加時に自動でGoogleカレンダーに予定が作成されます</p>
+      <div id="gcal-status" class="text-sm text-gray-400">確認中...</div>
+      <div id="gcal-connect-btn">
+        <button onclick="connectGoogleCalendar()" class="w-full bg-white border-2 border-gray-200 hover:border-blue-400 text-gray-700 font-semibold py-2 rounded-lg flex items-center justify-center gap-2 transition">
+          <svg class="w-5 h-5" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+          Googleカレンダーと連携する
+        </button>
+      </div>
+      <div id="gcal-disconnect-btn" class="hidden">
+        <button onclick="disconnectGoogleCalendar()" class="w-full text-red-500 border border-red-200 hover:bg-red-50 py-2 rounded-lg text-sm font-medium">連携を解除する</button>
+      </div>
+      <div id="gcal-msg" class="text-sm hidden"></div>
+    </div>
+  </div>
+</div>
+
+<div class="flex flex-1 overflow-hidden" id="view-contacts">
 
   <!-- Sidebar: Contact List -->
   <div id="sidebar" class="bg-white border-r flex flex-col overflow-hidden">
@@ -191,6 +343,229 @@
 <script>
 let contacts = [];
 let currentId = null;
+let authToken = localStorage.getItem('bni_token') || '';
+let gcalConnected = false;
+
+// ── 認証 ──────────────────────────────────────────────────
+function showRegister() {
+  document.getElementById('loginForm').classList.add('hidden');
+  document.getElementById('registerForm').classList.remove('hidden');
+}
+function showLogin() {
+  document.getElementById('registerForm').classList.add('hidden');
+  document.getElementById('loginForm').classList.remove('hidden');
+}
+
+async function doLogin() {
+  const username = document.getElementById('loginUsername').value.trim();
+  const pw = document.getElementById('loginPassword').value;
+  const errEl = document.getElementById('loginError');
+  errEl.classList.add('hidden');
+  try {
+    const r = await fetch(BASE + 'api/auth/login', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({username, password: pw})
+    });
+    if (!r.ok) {
+      let msg = 'ユーザー名またはパスワードが違います';
+      try { msg = (await r.json()).detail || msg; } catch {}
+      errEl.textContent = msg; errEl.classList.remove('hidden'); return;
+    }
+    const d = await r.json();
+    authToken = d.token;
+    localStorage.setItem('bni_token', authToken);
+    document.getElementById('loginScreen').classList.add('hidden');
+    loadContacts();
+  } catch(e) {
+    errEl.textContent = 'エラーが発生しました';
+    errEl.classList.remove('hidden');
+  }
+}
+
+async function doRegister() {
+  const username = document.getElementById('regUsername').value.trim();
+  const display_name = document.getElementById('regDisplayName').value.trim();
+  const password = document.getElementById('regPassword').value;
+  const errEl = document.getElementById('regError');
+  errEl.classList.add('hidden');
+  if (!username || !display_name || !password) { errEl.textContent = 'すべての項目を入力してください'; errEl.classList.remove('hidden'); return; }
+  try {
+    const r = await fetch(BASE + 'api/auth/register', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({username, display_name, password})
+    });
+    if (!r.ok) {
+      let msg = '登録に失敗しました';
+      try { msg = (await r.json()).detail || msg; } catch {}
+      errEl.textContent = msg; errEl.classList.remove('hidden'); return;
+    }
+    alert('アカウントを作成しました。ログインしてください。');
+    document.getElementById('regUsername').value = '';
+    document.getElementById('regDisplayName').value = '';
+    document.getElementById('regPassword').value = '';
+    showLogin();
+    document.getElementById('loginUsername').value = username;
+  } catch(e) {
+    errEl.textContent = 'エラーが発生しました'; errEl.classList.remove('hidden');
+  }
+}
+
+async function checkAuth() {
+  if (!authToken) return false;
+  try {
+    const r = await fetch(BASE + 'api/contacts', { headers: {'Authorization': authToken} });
+    return r.status !== 401;
+  } catch { return false; }
+}
+
+async function doLogout() {
+  await fetch(BASE + 'api/auth/logout', { method:'POST', headers:{'Authorization':authToken} }).catch(()=>{});
+  authToken = '';
+  localStorage.removeItem('bni_token');
+  location.reload();
+}
+
+// ── ビュー切替 ────────────────────────────────────────────
+function switchView(view) {
+  ['contacts','dashboard','calendar','myprofile','settings'].forEach(v => {
+    const el = document.getElementById('view-' + v);
+    if (el) el.classList.toggle('hidden', v !== view);
+    if (el) el.classList.toggle('flex', v === view && v === 'contacts');
+    const btn = document.getElementById('nav-' + v);
+    if (btn) btn.classList.toggle('nav-active', v === view);
+  });
+  const isContacts = view === 'contacts';
+  document.getElementById('btn-import')?.classList.toggle('hidden', !isContacts);
+  document.getElementById('btn-add')?.classList.toggle('hidden', !isContacts);
+  if (view === 'dashboard') { loadDashboard(); loadSuggestions(); }
+  if (view === 'calendar') loadCalendar();
+  if (view === 'myprofile') loadMyProfile();
+  if (view === 'settings') loadGcalStatus();
+}
+
+// ── ダッシュボード ─────────────────────────────────────────
+async function loadDashboard() {
+  const d = await api('GET', '/dashboard');
+  document.getElementById('d-total').textContent = d.total_contacts;
+  document.getElementById('d-reminders').textContent = d.pending_reminders;
+  document.getElementById('d-chapters').textContent = d.chapters;
+  const thisMonth = new Date().toISOString().substring(0,7);
+  const thisMonthData = d.monthly.find(m => m.month === thisMonth);
+  document.getElementById('d-month').textContent = thisMonthData ? thisMonthData.count : 0;
+
+  // 棒グラフ
+  const chart = document.getElementById('d-chart');
+  if (d.monthly.length) {
+    const max = Math.max(...d.monthly.map(m => m.count));
+    chart.innerHTML = d.monthly.map(m => `
+      <div class="flex flex-col items-center flex-1 gap-1">
+        <div class="text-xs text-gray-500">${m.count}</div>
+        <div class="w-full bg-blue-500 rounded-t" style="height:${max>0?Math.max(4, Math.round(m.count/max*100)):4}px"></div>
+        <div class="text-xs text-gray-400 whitespace-nowrap" style="font-size:10px">${m.month.substring(5)}月</div>
+      </div>`).join('');
+  } else {
+    chart.innerHTML = '<div class="text-gray-400 text-sm">データがありません</div>';
+  }
+
+  // 直近リマインダー
+  const upcoming = document.getElementById('d-upcoming');
+  if (d.upcoming_reminders.length) {
+    upcoming.innerHTML = d.upcoming_reminders.map(r =>
+      `<div class="flex gap-2 text-sm"><span class="text-gray-500 shrink-0">${r.date}</span><span class="font-medium">${esc(r.name)}</span><span class="text-gray-500">${esc(r.message||'')}</span></div>`
+    ).join('');
+  } else {
+    upcoming.innerHTML = '<div class="text-gray-400 text-sm">リマインダーはありません</div>';
+  }
+}
+
+async function loadSuggestions() {
+  const el = document.getElementById('d-suggestions');
+  if (!el) return;
+  try {
+    const data = await api('GET', '/suggestions/next-meetings');
+    if (!data.length) { el.innerHTML = '<div class="text-sm text-gray-400">コンタクトを登録すると候補が表示されます</div>'; return; }
+    const urgencyColor = s => s >= 60 ? 'text-red-600' : s >= 35 ? 'text-orange-500' : 'text-blue-600';
+    el.innerHTML = data.map(item => `
+      <div class="flex items-center gap-3 py-2 border-b last:border-0 cursor-pointer hover:bg-gray-50 rounded-lg px-2" onclick="switchView('contacts');setTimeout(()=>selectContact(${item.contact.id}),100)">
+        <div class="text-lg font-bold w-10 text-right shrink-0 ${urgencyColor(item.score)}">${item.score}</div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="font-medium text-sm text-gray-900">${esc(item.contact.name)}</span>
+            ${item.contact.category ? `<span class="text-xs text-gray-500">${esc(item.contact.category)}</span>` : ''}
+          </div>
+          <div class="text-xs text-gray-500 mt-0.5">${esc(item.reason)}</div>
+          <div class="flex gap-1 mt-1 flex-wrap">
+            ${item.tags.map(t => `<span class="text-xs bg-gray-100 text-gray-600 rounded-full px-2 py-0.5">${esc(t)}</span>`).join('')}
+          </div>
+        </div>
+        <div class="text-xs text-gray-400 shrink-0">→</div>
+      </div>`).join('');
+  } catch(e) {
+    el.innerHTML = '<div class="text-sm text-gray-400">読み込みに失敗しました</div>';
+  }
+}
+
+// ── マイプロフィール ───────────────────────────────────────
+const MP_FIELDS = ['name','company','chapter','category','business_description','selling_points','target_customers','referral_intro'];
+
+async function loadMyProfile() {
+  const p = await api('GET', '/my-profile');
+  MP_FIELDS.forEach(f => {
+    const el = document.getElementById('mp_' + f);
+    if (el) el.value = p[f] || '';
+  });
+  document.getElementById('mp_slug').value = p.slug || '';
+  document.getElementById('mp_public').checked = p.public || false;
+  updatePublicUrl(p.slug, p.public);
+}
+
+function updatePublicUrl(slug, isPublic) {
+  const el = document.getElementById('mp_public_url');
+  if (isPublic && slug) {
+    const url = window.location.origin + BASE + 'profile/' + slug;
+    el.innerHTML = `公開URL: <a href="${url}" target="_blank" class="underline">${url}</a>`;
+    el.classList.remove('hidden');
+  } else {
+    el.classList.add('hidden');
+  }
+}
+
+document.getElementById('mp_public')?.addEventListener('change', function() {
+  updatePublicUrl(document.getElementById('mp_slug').value, this.checked);
+});
+
+async function saveMyProfile() {
+  const data = {};
+  MP_FIELDS.forEach(f => { data[f] = document.getElementById('mp_' + f)?.value || ''; });
+  data.slug = document.getElementById('mp_slug').value.trim();
+  data.public = document.getElementById('mp_public').checked;
+  await api('PUT', '/my-profile', data);
+  updatePublicUrl(data.slug, data.public);
+  alert('保存しました');
+}
+
+// ── 設定 ─────────────────────────────────────────────────
+async function changePassword() {
+  const cur = document.getElementById('s_current_pw').value;
+  const nw = document.getElementById('s_new_pw').value;
+  const nw2 = document.getElementById('s_new_pw2').value;
+  const msg = document.getElementById('s_pw_msg');
+  if (nw.length < 8) { msg.textContent = '新しいパスワードは8文字以上にしてください'; msg.className = 'text-sm text-red-600'; msg.classList.remove('hidden'); return; }
+  if (nw !== nw2) { msg.textContent = 'パスワードが一致しません'; msg.className = 'text-sm text-red-600'; msg.classList.remove('hidden'); return; }
+  try {
+    await api('POST', '/auth/change-password', {current_password: cur, new_password: nw});
+    msg.textContent = 'パスワードを変更しました';
+    msg.className = 'text-sm text-green-600';
+    msg.classList.remove('hidden');
+    document.getElementById('s_current_pw').value = '';
+    document.getElementById('s_new_pw').value = '';
+    document.getElementById('s_new_pw2').value = '';
+  } catch(e) {
+    msg.textContent = '現在のパスワードが違います';
+    msg.className = 'text-sm text-red-600';
+    msg.classList.remove('hidden');
+  }
+}
 
 const FIELDS = ['name','reading','company','chapter','category','last_meeting_date',
   'business_description','area','birthplace','residence','spouse','family','previous_jobs',
@@ -203,9 +578,10 @@ const BASE = (() => {
 })();
 
 async function api(method, path, body) {
-  const opts = { method, headers: {'Content-Type':'application/json'} };
+  const opts = { method, headers: {'Content-Type':'application/json', 'Authorization': authToken} };
   if (body) opts.body = JSON.stringify(body);
   const r = await fetch(BASE + 'api' + path, opts);
+  if (r.status === 401) { location.reload(); return; }
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }
@@ -232,10 +608,13 @@ function renderList() {
 async function selectContact(id) {
   currentId = id;
   renderList();
-  const c = await api('GET', '/contacts/'+id);
-  const memos = await api('GET', '/contacts/'+id+'/memos');
-  const reminders = await api('GET', '/contacts/'+id+'/reminders');
-  renderDetail(c, memos, reminders);
+  const [c, memos, reminders, referrals] = await Promise.all([
+    api('GET', '/contacts/'+id),
+    api('GET', '/contacts/'+id+'/memos'),
+    api('GET', '/contacts/'+id+'/reminders'),
+    api('GET', '/contacts/'+id+'/referrals')
+  ]);
+  renderDetail(c, memos, reminders, referrals);
   document.getElementById('emptyState').classList.add('hidden');
   document.getElementById('contactDetail').classList.remove('hidden');
   // Mobile
@@ -250,7 +629,7 @@ function showList() {
   document.getElementById('backBtn').classList.add('hidden');
 }
 
-function renderDetail(c, memos, reminders) {
+function renderDetail(c, memos, reminders, referrals=[]) {
   const el = document.getElementById('contactDetail');
   el.innerHTML = `
     <div class="p-4 border-b flex items-start justify-between">
@@ -268,14 +647,14 @@ function renderDetail(c, memos, reminders) {
     <!-- Tabs -->
     <div class="border-b overflow-x-auto">
       <div class="flex" id="tabs">
-        ${['略歴','Power 1-2-1','GAINS','メモ','リマインダー','紹介文'].map((t,i)=>
+        ${['略歴','Power 1-2-1','GAINS','メモ','リマインダー','紹介文','🤝 AIマッチング','📋 紹介履歴'].map((t,i)=>
           `<button class="tab-btn${i===0?' tab-active':''}" onclick="showTab(${i})">${t}</button>`
         ).join('')}
       </div>
     </div>
 
     <div id="tabContent" class="p-4">
-      ${renderTabContent(c, memos, reminders, 0)}
+      ${renderTabContent(c, memos, reminders, 0, referrals)}
     </div>
   `;
 }
@@ -289,19 +668,22 @@ function showTab(idx) {
   Promise.all([
     api('GET','/contacts/'+currentId),
     api('GET','/contacts/'+currentId+'/memos'),
-    api('GET','/contacts/'+currentId+'/reminders')
-  ]).then(([contact, memos, reminders])=>{
-    document.getElementById('tabContent').innerHTML = renderTabContent(contact, memos, reminders, idx);
+    api('GET','/contacts/'+currentId+'/reminders'),
+    api('GET','/contacts/'+currentId+'/referrals')
+  ]).then(([contact, memos, reminders, referrals])=>{
+    document.getElementById('tabContent').innerHTML = renderTabContent(contact, memos, reminders, idx, referrals);
   });
 }
 
-function renderTabContent(c, memos, reminders, tab) {
+function renderTabContent(c, memos, reminders, tab, referrals=[]) {
   if (tab===0) return renderBiography(c);
   if (tab===1) return renderPower121(c);
   if (tab===2) return renderGains(c);
   if (tab===3) return renderMemos(memos, c.id);
   if (tab===4) return renderReminders(reminders, c.id);
   if (tab===5) return renderIntroduction(c);
+  if (tab===6) return renderMatching(c);
+  if (tab===7) return renderReferrals(referrals, c.id);
   return '';
 }
 
@@ -388,6 +770,7 @@ function renderReminders(reminders, cid) {
             <div class="text-sm font-medium text-gray-800">${esc(r.remind_date)}</div>
             ${r.message?`<div class="text-xs text-gray-500">${esc(r.message)}</div>`:''}
           </div>
+          ${gcalConnected ? `<button onclick="syncReminderGoogle(${r.id})" title="Googleカレンダーに追加" class="text-blue-400 hover:text-blue-600 text-sm px-1">🗓</button>` : ''}
           <button onclick="deleteReminder(${r.id},${cid})" class="text-red-400 hover:text-red-600 text-lg leading-none">&times;</button>
         </div>`).join('')
       : '<div class="text-sm text-gray-400">リマインダーがありません</div>'}
@@ -406,6 +789,162 @@ function renderIntroduction(c) {
       <textarea id="introText" rows="8" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">${esc(c.introduction||'')}</textarea>
       <button onclick="saveIntro(${c.id})" class="mt-2 text-sm bg-gray-800 text-white px-4 py-1.5 rounded-lg hover:bg-gray-700">保存</button>
     </div>`;
+}
+
+function renderReferrals(referrals, cid) {
+  const resultColors = {
+    '進行中': 'bg-yellow-100 text-yellow-700',
+    '成約': 'bg-green-100 text-green-700',
+    '不成立': 'bg-gray-100 text-gray-500'
+  };
+  const dirLabels = { given: '→ 相手に紹介', received: '← 紹介もらった' };
+  const dirColors = { given: 'text-blue-600', received: 'text-purple-600' };
+
+  const totalGiven = referrals.filter(r => r.direction === 'given').length;
+  const totalReceived = referrals.filter(r => r.direction === 'received').length;
+  const totalAmount = referrals.filter(r => r.result === '成約').reduce((s, r) => s + (r.amount || 0), 0);
+
+  return `
+    <div>
+      ${referrals.length ? `
+        <div class="flex gap-4 mb-4 text-sm">
+          <div class="bg-blue-50 rounded-lg px-3 py-2 text-center"><div class="font-bold text-blue-600">${totalGiven}</div><div class="text-xs text-gray-500">紹介した</div></div>
+          <div class="bg-purple-50 rounded-lg px-3 py-2 text-center"><div class="font-bold text-purple-600">${totalReceived}</div><div class="text-xs text-gray-500">紹介もらった</div></div>
+          ${totalAmount ? `<div class="bg-green-50 rounded-lg px-3 py-2 text-center"><div class="font-bold text-green-600">¥${totalAmount.toLocaleString()}</div><div class="text-xs text-gray-500">成約合計</div></div>` : ''}
+        </div>` : ''}
+      <div class="mb-4 border rounded-xl p-3 bg-gray-50 space-y-2">
+        <p class="text-xs font-semibold text-gray-500">新しい紹介を記録</p>
+        <div class="grid grid-cols-2 gap-2">
+          <select id="newRefDir" class="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+            <option value="given">→ 相手に紹介した</option>
+            <option value="received">← 紹介してもらった</option>
+          </select>
+          <input type="date" id="newRefDate" class="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+        </div>
+        <input type="text" id="newRefDesc" placeholder="紹介内容（例：Web制作の案件を紹介）" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+        <div class="flex gap-2">
+          <select id="newRefResult" class="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+            <option value="進行中">進行中</option>
+            <option value="成約">成約</option>
+            <option value="不成立">不成立</option>
+          </select>
+          <input type="number" id="newRefAmount" placeholder="成約金額（円）" class="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+          <button onclick="addReferral(${cid})" class="bg-blue-600 text-white text-sm px-3 py-2 rounded-lg hover:bg-blue-700 whitespace-nowrap">追加</button>
+        </div>
+      </div>
+      <div id="referralList">
+        ${referrals.length ? referrals.map(r => `
+          <div class="border rounded-lg p-3 mb-2 bg-white flex items-start gap-2">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="text-xs font-semibold ${dirColors[r.direction]||'text-gray-600'}">${dirLabels[r.direction]||r.direction}</span>
+                <span class="text-xs px-2 py-0.5 rounded-full font-medium ${resultColors[r.result]||'bg-gray-100 text-gray-600'}">${esc(r.result)}</span>
+                ${r.amount ? `<span class="text-xs text-green-700 font-semibold">¥${Number(r.amount).toLocaleString()}</span>` : ''}
+                ${r.date ? `<span class="text-xs text-gray-400">${esc(r.date)}</span>` : ''}
+              </div>
+              ${r.description ? `<div class="text-sm text-gray-800 mt-1">${esc(r.description)}</div>` : ''}
+            </div>
+            <div class="flex gap-1 shrink-0">
+              <select onchange="updateReferralResult(${r.id}, this.value, ${cid})" class="text-xs border rounded px-1 py-0.5">
+                <option ${r.result==='進行中'?'selected':''}>進行中</option>
+                <option ${r.result==='成約'?'selected':''}>成約</option>
+                <option ${r.result==='不成立'?'selected':''}>不成立</option>
+              </select>
+              <button onclick="deleteReferral(${r.id}, ${cid})" class="text-red-400 hover:text-red-600 text-lg leading-none px-1">&times;</button>
+            </div>
+          </div>`).join('')
+        : '<div class="text-sm text-gray-400">紹介履歴がありません</div>'}
+      </div>
+    </div>`;
+}
+
+async function addReferral(cid) {
+  const direction = document.getElementById('newRefDir').value;
+  const date = document.getElementById('newRefDate').value;
+  const description = document.getElementById('newRefDesc').value.trim();
+  const result = document.getElementById('newRefResult').value;
+  const amount = parseInt(document.getElementById('newRefAmount').value) || 0;
+  if (!description) return alert('紹介内容を入力してください');
+  await api('POST', '/contacts/'+cid+'/referrals', {direction, date, description, result, amount});
+  showTab(7);
+}
+
+async function updateReferralResult(rid, result, cid) {
+  const refs = await api('GET', '/contacts/'+cid+'/referrals');
+  const ref = refs.find(r => r.id === rid) || {};
+  await api('PUT', '/referrals/'+rid, {
+    direction: ref.direction || 'given',
+    date: ref.date || '',
+    description: ref.description || '',
+    result,
+    amount: ref.amount || 0
+  });
+  showTab(7);
+}
+
+async function deleteReferral(rid, cid) {
+  if (!confirm('削除しますか？')) return;
+  await api('DELETE', '/referrals/'+rid);
+  showTab(7);
+}
+
+function renderMatching(c) {
+  return `
+    <div>
+      <div class="flex items-start justify-between mb-4">
+        <div>
+          <div class="text-sm font-semibold text-gray-700">AIビジネスマッチング</div>
+          <div class="text-xs text-gray-400 mt-0.5">${esc(c.name)}さんと相性の良いメンバーをAIが分析します</div>
+        </div>
+        <button onclick="runMatching(${c.id})" id="matchBtn" class="text-sm bg-purple-600 text-white px-3 py-1.5 rounded-lg hover:bg-purple-700 whitespace-nowrap">
+          🤝 マッチング分析
+        </button>
+      </div>
+      <div id="matchResult">
+        <div class="text-sm text-gray-400 text-center py-8">「マッチング分析」ボタンを押すと、AIが相性の良いメンバーを分析します</div>
+      </div>
+    </div>`;
+}
+
+async function runMatching(cid) {
+  const btn = document.getElementById('matchBtn');
+  btn.textContent = '分析中...';
+  btn.disabled = true;
+  const resultEl = document.getElementById('matchResult');
+  resultEl.innerHTML = '<div class="text-sm text-gray-400 text-center py-8">AIが分析中です...</div>';
+  try {
+    const res = await api('POST', '/contacts/' + cid + '/match');
+    if (!res.matches || res.matches.length === 0) {
+      resultEl.innerHTML = '<div class="text-sm text-gray-400 text-center py-8">マッチング候補が見つかりませんでした。<br>コンタクトを2名以上登録すると分析できます。</div>';
+      return;
+    }
+    const scoreColor = i => i === 0 ? 'text-purple-600' : i === 1 ? 'text-blue-600' : 'text-gray-600';
+    const cardBorder = i => i === 0 ? 'border-purple-300 bg-purple-50' : 'border-gray-200 bg-gray-50';
+    resultEl.innerHTML = res.matches.map((m, i) => `
+      <div class="border rounded-xl p-4 mb-3 ${cardBorder(i)} cursor-pointer hover:shadow-sm transition" onclick="selectContact(${m.contact.id})">
+        <div class="flex items-start justify-between gap-2">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="font-bold text-gray-900">${i+1}位: ${esc(m.contact.name)}</span>
+              ${m.contact.category ? `<span class="text-xs text-white bg-gray-500 rounded-full px-2 py-0.5">${esc(m.contact.category)}</span>` : ''}
+            </div>
+            ${m.contact.company ? `<div class="text-xs text-gray-400 mt-0.5">${esc(m.contact.company)}</div>` : ''}
+          </div>
+          <div class="text-right shrink-0">
+            <div class="text-2xl font-bold ${scoreColor(i)}">${m.score}</div>
+            <div class="text-xs text-gray-400">/ 100</div>
+          </div>
+        </div>
+        <div class="mt-2 text-sm text-gray-700">${esc(m.reason)}</div>
+        ${m.referral_opportunity ? `<div class="mt-2 text-xs text-blue-700 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">💡 ${esc(m.referral_opportunity)}</div>` : ''}
+        <div class="mt-2 text-xs text-gray-400 text-right">タップして詳細を表示 →</div>
+      </div>`).join('');
+  } catch(e) {
+    resultEl.innerHTML = `<div class="text-sm text-red-600 bg-red-50 rounded-lg p-3">❌ ${esc(e.message)}</div>`;
+  } finally {
+    btn.innerHTML = '🤝 マッチング分析';
+    btn.disabled = false;
+  }
 }
 
 async function addMemo(cid) {
@@ -596,7 +1135,7 @@ async function runImport() {
       if (!file) { alert('ファイルを選択してください'); return; }
       const fd = new FormData();
       fd.append('file', file);
-      const r = await fetch(BASE + 'api/import/file', { method: 'POST', body: fd });
+      const r = await fetch(BASE + 'api/import/file', { method: 'POST', body: fd, headers:{'Authorization':authToken} });
       if (!r.ok) {
         let msg = r.statusText;
         try { msg = (await r.json()).detail || msg; } catch {}
@@ -608,7 +1147,7 @@ async function runImport() {
       if (!url) { alert('URLを入力してください'); return; }
       const fd = new FormData();
       fd.append('url', url);
-      const r = await fetch(BASE + 'api/import/url', { method: 'POST', body: fd });
+      const r = await fetch(BASE + 'api/import/url', { method: 'POST', body: fd, headers:{'Authorization':authToken} });
       if (!r.ok) {
         let msg = r.statusText;
         try { msg = (await r.json()).detail || msg; } catch {}
@@ -666,8 +1205,235 @@ async function saveImported() {
   if (contacts.length) selectContact(contacts[0].id);
 }
 
+// ── カレンダー ────────────────────────────────────────────
+let calYear = new Date().getFullYear();
+let calMonth = new Date().getMonth() + 1;
+let calData = { reminders: [], meetings: [] };
+let calGoogleEvents = [];
+
+async function loadCalendar() {
+  const [bniData, gcalData] = await Promise.all([
+    api('GET', `/calendar?year=${calYear}&month=${calMonth}`),
+    gcalConnected ? api('GET', `/calendar/google?year=${calYear}&month=${calMonth}`) : Promise.resolve({ events: [], connected: false })
+  ]);
+  calData = bniData;
+  calGoogleEvents = gcalData.events || [];
+  const legend = document.getElementById('cal-gcal-legend');
+  if (legend) legend.classList.toggle('hidden', !gcalData.connected || !calGoogleEvents.length);
+  renderCalendar();
+}
+
+function calPrev() {
+  calMonth--;
+  if (calMonth < 1) { calMonth = 12; calYear--; }
+  loadCalendar();
+}
+
+function calNext() {
+  calMonth++;
+  if (calMonth > 12) { calMonth = 1; calYear++; }
+  loadCalendar();
+}
+
+function renderCalendar() {
+  document.getElementById('cal-title').textContent = `${calYear}年 ${calMonth}月`;
+  document.getElementById('cal-detail').classList.add('hidden');
+
+  // イベントを日付ごとにマップ
+  const eventMap = {};
+  calData.reminders.forEach(r => {
+    const d = r.remind_date;
+    if (!eventMap[d]) eventMap[d] = [];
+    eventMap[d].push({ type: 'reminder', ...r });
+  });
+  calData.meetings.forEach(m => {
+    const d = m.last_meeting_date;
+    if (!eventMap[d]) eventMap[d] = [];
+    eventMap[d].push({ type: 'meeting', ...m });
+  });
+  calGoogleEvents.forEach(e => {
+    const d = e.date;
+    if (!eventMap[d]) eventMap[d] = [];
+    eventMap[d].push({ type: 'gcal', ...e });
+  });
+
+  const firstDay = new Date(calYear, calMonth - 1, 1).getDay();
+  const daysInMonth = new Date(calYear, calMonth, 0).getDate();
+  const today = new Date().toISOString().substring(0, 10);
+
+  const grid = document.getElementById('cal-grid');
+  let html = '';
+
+  for (let i = 0; i < firstDay; i++) {
+    html += '<div class="min-h-[60px] border-b border-r border-gray-100 bg-gray-50"></div>';
+  }
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${calYear}-${String(calMonth).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const events = eventMap[dateStr] || [];
+    const isToday = dateStr === today;
+    const dow = (firstDay + d - 1) % 7;
+    const isSun = dow === 0, isSat = dow === 6;
+
+    const reminders = events.filter(e => e.type === 'reminder');
+    const meetings = events.filter(e => e.type === 'meeting');
+
+    html += `
+      <div class="min-h-[60px] border-b border-r border-gray-100 p-1 cursor-pointer hover:bg-blue-50 transition ${events.length ? 'bg-blue-50/30' : ''}"
+           onclick="showCalDay('${dateStr}')">
+        <div class="text-xs font-semibold mb-1 w-6 h-6 flex items-center justify-center rounded-full
+          ${isToday ? 'bg-blue-600 text-white' : isSun ? 'text-red-400' : isSat ? 'text-blue-400' : 'text-gray-700'}">
+          ${d}
+        </div>
+        <div class="flex flex-wrap gap-0.5">
+          ${reminders.map(() => `<span class="w-2 h-2 rounded-full bg-blue-500 inline-block"></span>`).join('')}
+          ${meetings.map(() => `<span class="w-2 h-2 rounded-full bg-green-500 inline-block"></span>`).join('')}
+          ${events.filter(e=>e.type==='gcal').map(() => `<span class="w-2 h-2 rounded-full bg-orange-400 inline-block"></span>`).join('')}
+        </div>
+        ${events.length ? `<div class="text-xs text-gray-500 mt-0.5 truncate leading-tight">${esc(events[0].contact_name || events[0].name || events[0].title || '')}</div>` : ''}
+      </div>`;
+  }
+
+  // 残りのセルを埋める
+  const total = firstDay + daysInMonth;
+  const remaining = total % 7 === 0 ? 0 : 7 - (total % 7);
+  for (let i = 0; i < remaining; i++) {
+    html += '<div class="min-h-[60px] border-b border-r border-gray-100 bg-gray-50"></div>';
+  }
+
+  grid.innerHTML = html;
+}
+
+function showCalDay(dateStr) {
+  const eventMap = {};
+  calData.reminders.forEach(r => {
+    if (!eventMap[r.remind_date]) eventMap[r.remind_date] = [];
+    eventMap[r.remind_date].push({ type: 'reminder', ...r });
+  });
+  calData.meetings.forEach(m => {
+    if (!eventMap[m.last_meeting_date]) eventMap[m.last_meeting_date] = [];
+    eventMap[m.last_meeting_date].push({ type: 'meeting', ...m });
+  });
+  calGoogleEvents.forEach(e => {
+    if (!eventMap[e.date]) eventMap[e.date] = [];
+    eventMap[e.date].push({ type: 'gcal', ...e });
+  });
+
+  const events = eventMap[dateStr] || [];
+  const detail = document.getElementById('cal-detail');
+  const dateObj = new Date(dateStr + 'T00:00:00');
+  const label = `${dateObj.getFullYear()}年${dateObj.getMonth()+1}月${dateObj.getDate()}日`;
+
+  document.getElementById('cal-detail-date').textContent = label;
+
+  if (!events.length) {
+    document.getElementById('cal-detail-content').innerHTML =
+      '<div class="text-sm text-gray-400">この日の予定はありません</div>';
+  } else {
+    document.getElementById('cal-detail-content').innerHTML = events.map(e => {
+      if (e.type === 'reminder') {
+        return `<div class="flex items-start gap-2 p-2 rounded-lg bg-blue-50 cursor-pointer hover:bg-blue-100" onclick="switchView('contacts');setTimeout(()=>selectContact(${e.contact_id}),100)">
+          <span class="w-2.5 h-2.5 rounded-full bg-blue-500 mt-1 shrink-0"></span>
+          <div>
+            <div class="text-sm font-medium text-gray-800">${esc(e.contact_name)}</div>
+            ${e.message ? `<div class="text-xs text-gray-500">${esc(e.message)}</div>` : ''}
+            <div class="text-xs text-gray-400">${e.done ? '✅ 完了' : '⏰ リマインダー'}</div>
+          </div>
+        </div>`;
+      } else if (e.type === 'meeting') {
+        return `<div class="flex items-start gap-2 p-2 rounded-lg bg-green-50 cursor-pointer hover:bg-green-100" onclick="switchView('contacts');setTimeout(()=>selectContact(${e.id}),100)">
+          <span class="w-2.5 h-2.5 rounded-full bg-green-500 mt-1 shrink-0"></span>
+          <div>
+            <div class="text-sm font-medium text-gray-800">${esc(e.name)}</div>
+            ${e.category ? `<div class="text-xs text-gray-500">${esc(e.category)}${e.company ? ' / ' + esc(e.company) : ''}</div>` : ''}
+            <div class="text-xs text-gray-400">🤝 1on1実施</div>
+          </div>
+        </div>`;
+      } else {
+        const timeStr = e.time ? new Date(e.time).toLocaleTimeString('ja-JP', {hour:'2-digit', minute:'2-digit'}) : '終日';
+        return `<div class="flex items-start gap-2 p-2 rounded-lg bg-orange-50 ${e.url ? 'cursor-pointer hover:bg-orange-100' : ''}" ${e.url ? `onclick="window.open('${e.url}','_blank')"` : ''}>
+          <span class="w-2.5 h-2.5 rounded-full bg-orange-400 mt-1 shrink-0"></span>
+          <div class="flex-1 min-w-0">
+            <div class="text-sm font-medium text-gray-800">${esc(e.title)}</div>
+            <div class="text-xs text-gray-400">🗓 ${timeStr}${e.url ? ' · タップで開く' : ''}</div>
+          </div>
+        </div>`;
+      }
+    }).join('');
+  }
+
+  detail.classList.remove('hidden');
+  detail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// ── Googleカレンダー連携 ──────────────────────────────────
+async function loadGcalStatus() {
+  try {
+    const d = await api('GET', '/auth/google/status');
+    gcalConnected = d.connected;
+    const statusEl = document.getElementById('gcal-status');
+    const connectBtn = document.getElementById('gcal-connect-btn');
+    const disconnectBtn = document.getElementById('gcal-disconnect-btn');
+    if (d.connected) {
+      statusEl.innerHTML = `<span class="text-green-600 font-medium">✅ 連携済み</span><span class="text-gray-400 text-xs ml-2">${d.connected_at || ''}</span>`;
+      connectBtn.classList.add('hidden');
+      disconnectBtn.classList.remove('hidden');
+    } else {
+      statusEl.textContent = '未連携';
+      connectBtn.classList.remove('hidden');
+      disconnectBtn.classList.add('hidden');
+    }
+  } catch(e) {}
+}
+
+function connectGoogleCalendar() {
+  window.location.href = BASE + 'api/auth/google/calendar?token=' + encodeURIComponent(authToken);
+}
+
+async function disconnectGoogleCalendar() {
+  if (!confirm('Googleカレンダーの連携を解除しますか？')) return;
+  await api('DELETE', '/auth/google/calendar');
+  gcalConnected = false;
+  loadGcalStatus();
+}
+
+async function syncReminderGoogle(rid) {
+  try {
+    const res = await api('POST', '/reminders/' + rid + '/sync-google');
+    if (res.event_url) {
+      if (confirm('Googleカレンダーに追加しました。カレンダーで確認しますか？')) {
+        window.open(res.event_url, '_blank');
+      }
+    }
+  } catch(e) {
+    alert('同期に失敗しました。設定画面でGoogleカレンダーを連携してください。');
+  }
+}
+
 // Init
-loadContacts();
+(async () => {
+  const params = new URLSearchParams(window.location.search);
+  if (authToken && await checkAuth()) {
+    document.getElementById('loginScreen').classList.add('hidden');
+    loadContacts();
+    api('GET', '/auth/google/status').then(d => { gcalConnected = d.connected; }).catch(() => {});
+    if (params.get('google_connected') === '1') {
+      history.replaceState({}, '', window.location.pathname);
+      switchView('settings');
+      const msg = document.getElementById('gcal-msg');
+      msg.textContent = '✅ Googleカレンダーの連携が完了しました！';
+      msg.className = 'text-sm text-green-600';
+      msg.classList.remove('hidden');
+    } else if (params.get('google_error') === '1') {
+      history.replaceState({}, '', window.location.pathname);
+      switchView('settings');
+      const msg = document.getElementById('gcal-msg');
+      msg.textContent = '❌ 連携に失敗しました。もう一度お試しください。';
+      msg.className = 'text-sm text-red-600';
+      msg.classList.remove('hidden');
+    }
+  }
+})();
 </script>
 </body>
 </html>

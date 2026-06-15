@@ -59,6 +59,7 @@
     <nav class="hidden md:flex gap-1 text-sm">
       <button onclick="switchView('contacts')" id="nav-contacts" class="nav-btn nav-active px-3 py-1.5 rounded-lg">👥 1to1リスト</button>
       <button onclick="switchView('dashboard')" id="nav-dashboard" class="nav-btn px-3 py-1.5 rounded-lg">📊 ダッシュボード</button>
+      <button onclick="switchView('calendar')" id="nav-calendar" class="nav-btn px-3 py-1.5 rounded-lg">📅 カレンダー</button>
       <button onclick="switchView('myprofile')" id="nav-myprofile" class="nav-btn px-3 py-1.5 rounded-lg">👤 マイプロフィール</button>
       <button onclick="switchView('settings')" id="nav-settings" class="nav-btn px-3 py-1.5 rounded-lg">⚙ 設定</button>
     </nav>
@@ -87,6 +88,40 @@
       <div id="d-upcoming" class="space-y-2 text-sm"></div>
     </div>
   </div>
+  <div class="bg-white rounded-xl shadow p-4 mt-4">
+    <h3 class="font-bold text-gray-700 mb-3 text-sm">📅 次の1on1候補（優先度順）</h3>
+    <div id="d-suggestions" class="space-y-2"></div>
+  </div>
+</div>
+
+<!-- Calendar View -->
+<div id="view-calendar" class="hidden flex-1 overflow-y-auto p-4 bg-gray-50">
+  <div class="max-w-2xl mx-auto">
+    <div class="flex items-center justify-between mb-4">
+      <button onclick="calPrev()" class="text-gray-500 hover:text-gray-800 px-3 py-1.5 rounded-lg hover:bg-gray-200 text-lg">‹</button>
+      <h2 id="cal-title" class="text-lg font-bold text-gray-800"></h2>
+      <button onclick="calNext()" class="text-gray-500 hover:text-gray-800 px-3 py-1.5 rounded-lg hover:bg-gray-200 text-lg">›</button>
+    </div>
+    <div class="flex gap-3 mb-3 text-xs flex-wrap">
+      <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-blue-500 inline-block"></span>リマインダー</span>
+      <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-green-500 inline-block"></span>1on1実施</span>
+      <span id="cal-gcal-legend" class="items-center gap-1 hidden"><span class="w-3 h-3 rounded-full bg-orange-400 inline-block"></span>Googleカレンダー</span>
+    </div>
+    <div class="bg-white rounded-xl shadow overflow-hidden">
+      <div class="grid grid-cols-7 text-center text-xs font-semibold text-gray-500 border-b">
+        <div class="py-2">日</div><div class="py-2">月</div><div class="py-2">火</div>
+        <div class="py-2">水</div><div class="py-2">木</div><div class="py-2">金</div>
+        <div class="py-2 text-blue-400">土</div>
+      </div>
+      <div id="cal-grid" class="grid grid-cols-7"></div>
+    </div>
+    <div id="cal-detail" class="mt-4 hidden">
+      <div class="bg-white rounded-xl shadow p-4">
+        <h3 id="cal-detail-date" class="font-bold text-gray-700 mb-3 text-sm"></h3>
+        <div id="cal-detail-content" class="space-y-2"></div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- My Profile View -->
@@ -94,7 +129,10 @@
   <div class="max-w-2xl mx-auto">
     <div class="flex items-center justify-between mb-5">
       <h2 class="text-xl font-bold text-gray-800">マイプロフィール</h2>
-      <button onclick="saveMyProfile()" class="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700 font-semibold">保存</button>
+      <div class="flex gap-2">
+        <button onclick="openProfileImport()" class="bg-green-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-green-700 font-semibold">📥 シートから取込</button>
+        <button onclick="saveMyProfile()" class="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700 font-semibold">保存</button>
+      </div>
     </div>
     <div class="bg-white rounded-xl shadow p-5 space-y-4">
       <div class="grid grid-cols-2 gap-3">
@@ -119,8 +157,8 @@
 
 <!-- Settings View -->
 <div id="view-settings" class="hidden flex-1 overflow-y-auto p-6 bg-gray-50">
-  <div class="max-w-md mx-auto">
-    <h2 class="text-xl font-bold text-gray-800 mb-5">アカウント設定</h2>
+  <div class="max-w-md mx-auto space-y-5">
+    <h2 class="text-xl font-bold text-gray-800">アカウント設定</h2>
     <div class="bg-white rounded-xl shadow p-5 space-y-4">
       <h3 class="font-bold text-gray-700">パスワード変更</h3>
       <input id="s_current_pw" type="password" placeholder="現在のパスワード" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
@@ -128,6 +166,21 @@
       <input id="s_new_pw2" type="password" placeholder="新しいパスワード（確認）" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
       <div id="s_pw_msg" class="text-sm hidden"></div>
       <button onclick="changePassword()" class="w-full bg-blue-600 text-white font-semibold py-2 rounded-lg hover:bg-blue-700">パスワードを変更</button>
+    </div>
+    <div class="bg-white rounded-xl shadow p-5 space-y-3">
+      <h3 class="font-bold text-gray-700">🗓 Googleカレンダー連携</h3>
+      <p class="text-xs text-gray-500">連携するとリマインダー追加時に自動でGoogleカレンダーに予定が作成されます</p>
+      <div id="gcal-status" class="text-sm text-gray-400">確認中...</div>
+      <div id="gcal-connect-btn">
+        <button onclick="connectGoogleCalendar()" class="w-full bg-white border-2 border-gray-200 hover:border-blue-400 text-gray-700 font-semibold py-2 rounded-lg flex items-center justify-center gap-2 transition">
+          <svg class="w-5 h-5" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+          Googleカレンダーと連携する
+        </button>
+      </div>
+      <div id="gcal-disconnect-btn" class="hidden">
+        <button onclick="disconnectGoogleCalendar()" class="w-full text-red-500 border border-red-200 hover:bg-red-50 py-2 rounded-lg text-sm font-medium">連携を解除する</button>
+      </div>
+      <div id="gcal-msg" class="text-sm hidden"></div>
     </div>
   </div>
 </div>
@@ -202,6 +255,50 @@
       <div class="flex gap-2">
         <button id="importParseBtn" onclick="runImport()" class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold">🔍 解析</button>
         <button id="importSaveBtn" onclick="saveImported()" class="hidden px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold">✅ この内容で登録</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Profile Import Modal -->
+<div id="profileImportModal" class="fixed inset-0 bg-black bg-opacity-40 hidden z-50 overflow-y-auto">
+  <div class="bg-white max-w-xl mx-auto my-10 rounded-xl shadow-xl overflow-hidden">
+    <div class="bg-green-600 text-white px-6 py-4 flex items-center justify-between">
+      <h2 class="font-bold text-lg">📥 プロフィールをシートから取込</h2>
+      <button onclick="closeProfileImport()" class="text-white text-2xl leading-none">&times;</button>
+    </div>
+    <div class="p-6 space-y-5">
+      <div class="flex border-b">
+        <button id="piTabFile" onclick="switchPiTab('file')" class="tab-btn tab-active">ファイルアップロード</button>
+        <button id="piTabUrl" onclick="switchPiTab('url')" class="tab-btn">Google Docs URL</button>
+      </div>
+      <div id="piFileArea">
+        <label class="block border-2 border-dashed border-gray-300 rounded-xl p-8 text-center cursor-pointer hover:border-green-400 transition" id="piDropZone">
+          <div class="text-4xl mb-2">📄</div>
+          <div class="text-sm font-medium text-gray-700">Power 1-2-1シートをここにドロップ</div>
+          <div class="text-xs text-gray-400 mt-1">PDF・Word・TXT対応</div>
+          <input type="file" id="piFile" accept=".pdf,.docx,.doc,.txt" class="hidden" onchange="onPiFileSelect(this)">
+        </label>
+        <div id="piFileName" class="text-sm text-green-600 mt-2 hidden"></div>
+      </div>
+      <div id="piUrlArea" class="hidden">
+        <label class="text-sm font-medium text-gray-700">Google Docs / Sheets の URL</label>
+        <input id="piUrl" type="text" placeholder="https://docs.google.com/document/d/..." class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400">
+      </div>
+      <div id="piPreview" class="hidden">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="text-sm font-bold text-gray-700">✅ 解析結果</span>
+          <span class="text-xs text-gray-400">内容を確認して「プロフィールに反映」を押してください</span>
+        </div>
+        <div id="piPreviewContent" class="border rounded-lg p-3 bg-gray-50 text-sm space-y-1 max-h-56 overflow-y-auto"></div>
+      </div>
+      <div id="piError" class="hidden text-sm text-red-600 bg-red-50 rounded-lg p-3"></div>
+    </div>
+    <div class="px-6 py-4 bg-gray-50 flex justify-between">
+      <button onclick="closeProfileImport()" class="px-4 py-2 text-sm text-gray-600 border rounded-lg hover:bg-gray-100">キャンセル</button>
+      <div class="flex gap-2">
+        <button id="piParseBtn" onclick="runProfileImport()" class="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold">🔍 解析</button>
+        <button id="piSaveBtn" onclick="applyProfileImport()" class="hidden px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold">✅ プロフィールに反映</button>
       </div>
     </div>
   </div>
@@ -294,6 +391,7 @@
 let contacts = [];
 let currentId = null;
 let authToken = localStorage.getItem('bni_token') || '';
+let gcalConnected = false;
 
 // ── 認証 ──────────────────────────────────────────────────
 function showRegister() {
@@ -376,7 +474,7 @@ async function doLogout() {
 
 // ── ビュー切替 ────────────────────────────────────────────
 function switchView(view) {
-  ['contacts','dashboard','myprofile','settings'].forEach(v => {
+  ['contacts','dashboard','calendar','myprofile','settings'].forEach(v => {
     const el = document.getElementById('view-' + v);
     if (el) el.classList.toggle('hidden', v !== view);
     if (el) el.classList.toggle('flex', v === view && v === 'contacts');
@@ -386,8 +484,10 @@ function switchView(view) {
   const isContacts = view === 'contacts';
   document.getElementById('btn-import')?.classList.toggle('hidden', !isContacts);
   document.getElementById('btn-add')?.classList.toggle('hidden', !isContacts);
-  if (view === 'dashboard') loadDashboard();
+  if (view === 'dashboard') { loadDashboard(); loadSuggestions(); }
+  if (view === 'calendar') loadCalendar();
   if (view === 'myprofile') loadMyProfile();
+  if (view === 'settings') loadGcalStatus();
 }
 
 // ── ダッシュボード ─────────────────────────────────────────
@@ -422,6 +522,33 @@ async function loadDashboard() {
     ).join('');
   } else {
     upcoming.innerHTML = '<div class="text-gray-400 text-sm">リマインダーはありません</div>';
+  }
+}
+
+async function loadSuggestions() {
+  const el = document.getElementById('d-suggestions');
+  if (!el) return;
+  try {
+    const data = await api('GET', '/suggestions/next-meetings');
+    if (!data.length) { el.innerHTML = '<div class="text-sm text-gray-400">コンタクトを登録すると候補が表示されます</div>'; return; }
+    const urgencyColor = s => s >= 60 ? 'text-red-600' : s >= 35 ? 'text-orange-500' : 'text-blue-600';
+    el.innerHTML = data.map(item => `
+      <div class="flex items-center gap-3 py-2 border-b last:border-0 cursor-pointer hover:bg-gray-50 rounded-lg px-2" onclick="switchView('contacts');setTimeout(()=>selectContact(${item.contact.id}),100)">
+        <div class="text-lg font-bold w-10 text-right shrink-0 ${urgencyColor(item.score)}">${item.score}</div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="font-medium text-sm text-gray-900">${esc(item.contact.name)}</span>
+            ${item.contact.category ? `<span class="text-xs text-gray-500">${esc(item.contact.category)}</span>` : ''}
+          </div>
+          <div class="text-xs text-gray-500 mt-0.5">${esc(item.reason)}</div>
+          <div class="flex gap-1 mt-1 flex-wrap">
+            ${item.tags.map(t => `<span class="text-xs bg-gray-100 text-gray-600 rounded-full px-2 py-0.5">${esc(t)}</span>`).join('')}
+          </div>
+        </div>
+        <div class="text-xs text-gray-400 shrink-0">→</div>
+      </div>`).join('');
+  } catch(e) {
+    el.innerHTML = '<div class="text-sm text-gray-400">読み込みに失敗しました</div>';
   }
 }
 
@@ -528,10 +655,13 @@ function renderList() {
 async function selectContact(id) {
   currentId = id;
   renderList();
-  const c = await api('GET', '/contacts/'+id);
-  const memos = await api('GET', '/contacts/'+id+'/memos');
-  const reminders = await api('GET', '/contacts/'+id+'/reminders');
-  renderDetail(c, memos, reminders);
+  const [c, memos, reminders, referrals] = await Promise.all([
+    api('GET', '/contacts/'+id),
+    api('GET', '/contacts/'+id+'/memos'),
+    api('GET', '/contacts/'+id+'/reminders'),
+    api('GET', '/contacts/'+id+'/referrals')
+  ]);
+  renderDetail(c, memos, reminders, referrals);
   document.getElementById('emptyState').classList.add('hidden');
   document.getElementById('contactDetail').classList.remove('hidden');
   // Mobile
@@ -546,7 +676,8 @@ function showList() {
   document.getElementById('backBtn').classList.add('hidden');
 }
 
-function renderDetail(c, memos, reminders) {
+function renderDetail(c, memos, reminders, referrals=[]) {
+  currentContactName = c.name || '';
   const el = document.getElementById('contactDetail');
   el.innerHTML = `
     <div class="p-4 border-b flex items-start justify-between">
@@ -555,7 +686,8 @@ function renderDetail(c, memos, reminders) {
         <div class="text-sm text-gray-500 mt-0.5">${esc(c.category||'')}${c.company?' — '+esc(c.company):''}</div>
         ${c.chapter?`<div class="text-xs text-gray-400 mt-0.5">${esc(c.chapter)}</div>`:''}
       </div>
-      <div class="flex gap-2">
+      <div class="flex gap-2 flex-wrap">
+        <button onclick="start121(${c.id}, '${esc(c.name)}')" class="text-sm bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-lg font-medium">🎙️ 1-2-1開始</button>
         <button onclick="openEditModal(${c.id})" class="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg">編集</button>
         <button onclick="confirmDelete(${c.id})" class="text-sm bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-lg">削除</button>
       </div>
@@ -564,14 +696,14 @@ function renderDetail(c, memos, reminders) {
     <!-- Tabs -->
     <div class="border-b overflow-x-auto">
       <div class="flex" id="tabs">
-        ${['略歴','Power 1-2-1','GAINS','メモ','リマインダー','紹介文'].map((t,i)=>
+        ${['略歴','Power 1-2-1','GAINS','メモ','リマインダー','紹介文','🤝 AIマッチング','📋 紹介履歴','🎙️ 1-2-1履歴'].map((t,i)=>
           `<button class="tab-btn${i===0?' tab-active':''}" onclick="showTab(${i})">${t}</button>`
         ).join('')}
       </div>
     </div>
 
     <div id="tabContent" class="p-4">
-      ${renderTabContent(c, memos, reminders, 0)}
+      ${renderTabContent(c, memos, reminders, 0, referrals)}
     </div>
   `;
 }
@@ -582,22 +714,32 @@ function showTab(idx) {
   });
   const c = contacts.find(x=>x.id===currentId) || {};
   // Re-fetch full data
-  Promise.all([
+  const fetchList = [
     api('GET','/contacts/'+currentId),
     api('GET','/contacts/'+currentId+'/memos'),
-    api('GET','/contacts/'+currentId+'/reminders')
-  ]).then(([contact, memos, reminders])=>{
-    document.getElementById('tabContent').innerHTML = renderTabContent(contact, memos, reminders, idx);
+    api('GET','/contacts/'+currentId+'/reminders'),
+    api('GET','/contacts/'+currentId+'/referrals'),
+    idx===8 ? api('GET','/contacts/'+currentId+'/one-on-ones') : Promise.resolve([])
+  ];
+  Promise.all(fetchList).then(([contact, memos, reminders, referrals, oneOnOnes])=>{
+    if (idx===8) {
+      document.getElementById('tabContent').innerHTML = renderOneOnOnes(oneOnOnes, currentId);
+    } else {
+      document.getElementById('tabContent').innerHTML = renderTabContent(contact, memos, reminders, idx, referrals);
+    }
   });
 }
 
-function renderTabContent(c, memos, reminders, tab) {
+function renderTabContent(c, memos, reminders, tab, referrals=[]) {
   if (tab===0) return renderBiography(c);
   if (tab===1) return renderPower121(c);
   if (tab===2) return renderGains(c);
   if (tab===3) return renderMemos(memos, c.id);
   if (tab===4) return renderReminders(reminders, c.id);
   if (tab===5) return renderIntroduction(c);
+  if (tab===6) return renderMatching(c);
+  if (tab===7) return renderReferrals(referrals, c.id);
+  if (tab===8) return renderOneOnOnes([], c.id);
   return '';
 }
 
@@ -684,6 +826,7 @@ function renderReminders(reminders, cid) {
             <div class="text-sm font-medium text-gray-800">${esc(r.remind_date)}</div>
             ${r.message?`<div class="text-xs text-gray-500">${esc(r.message)}</div>`:''}
           </div>
+          ${gcalConnected ? `<button onclick="syncReminderGoogle(${r.id})" title="Googleカレンダーに追加" class="text-blue-400 hover:text-blue-600 text-sm px-1">🗓</button>` : ''}
           <button onclick="deleteReminder(${r.id},${cid})" class="text-red-400 hover:text-red-600 text-lg leading-none">&times;</button>
         </div>`).join('')
       : '<div class="text-sm text-gray-400">リマインダーがありません</div>'}
@@ -702,6 +845,208 @@ function renderIntroduction(c) {
       <textarea id="introText" rows="8" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">${esc(c.introduction||'')}</textarea>
       <button onclick="saveIntro(${c.id})" class="mt-2 text-sm bg-gray-800 text-white px-4 py-1.5 rounded-lg hover:bg-gray-700">保存</button>
     </div>`;
+}
+
+function renderReferrals(referrals, cid) {
+  const resultColors = {
+    '進行中': 'bg-yellow-100 text-yellow-700',
+    '成約': 'bg-green-100 text-green-700',
+    '不成立': 'bg-gray-100 text-gray-500'
+  };
+  const dirLabels = { given: '→ 相手に紹介', received: '← 紹介もらった' };
+  const dirColors = { given: 'text-blue-600', received: 'text-purple-600' };
+
+  const totalGiven = referrals.filter(r => r.direction === 'given').length;
+  const totalReceived = referrals.filter(r => r.direction === 'received').length;
+  const totalAmount = referrals.filter(r => r.result === '成約').reduce((s, r) => s + (r.amount || 0), 0);
+
+  return `
+    <div>
+      ${referrals.length ? `
+        <div class="flex gap-4 mb-4 text-sm">
+          <div class="bg-blue-50 rounded-lg px-3 py-2 text-center"><div class="font-bold text-blue-600">${totalGiven}</div><div class="text-xs text-gray-500">紹介した</div></div>
+          <div class="bg-purple-50 rounded-lg px-3 py-2 text-center"><div class="font-bold text-purple-600">${totalReceived}</div><div class="text-xs text-gray-500">紹介もらった</div></div>
+          ${totalAmount ? `<div class="bg-green-50 rounded-lg px-3 py-2 text-center"><div class="font-bold text-green-600">¥${totalAmount.toLocaleString()}</div><div class="text-xs text-gray-500">成約合計</div></div>` : ''}
+        </div>` : ''}
+      <div class="mb-4 border rounded-xl p-3 bg-gray-50 space-y-2">
+        <p class="text-xs font-semibold text-gray-500">新しい紹介を記録</p>
+        <div class="grid grid-cols-2 gap-2">
+          <select id="newRefDir" class="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+            <option value="given">→ 相手に紹介した</option>
+            <option value="received">← 紹介してもらった</option>
+          </select>
+          <input type="date" id="newRefDate" class="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+        </div>
+        <input type="text" id="newRefDesc" placeholder="紹介内容（例：Web制作の案件を紹介）" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+        <div class="flex gap-2">
+          <select id="newRefResult" class="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+            <option value="進行中">進行中</option>
+            <option value="成約">成約</option>
+            <option value="不成立">不成立</option>
+          </select>
+          <input type="number" id="newRefAmount" placeholder="成約金額（円）" class="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+          <button onclick="addReferral(${cid})" class="bg-blue-600 text-white text-sm px-3 py-2 rounded-lg hover:bg-blue-700 whitespace-nowrap">追加</button>
+        </div>
+      </div>
+      <div id="referralList">
+        ${referrals.length ? referrals.map(r => `
+          <div class="border rounded-lg p-3 mb-2 bg-white flex items-start gap-2">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="text-xs font-semibold ${dirColors[r.direction]||'text-gray-600'}">${dirLabels[r.direction]||r.direction}</span>
+                <span class="text-xs px-2 py-0.5 rounded-full font-medium ${resultColors[r.result]||'bg-gray-100 text-gray-600'}">${esc(r.result)}</span>
+                ${r.amount ? `<span class="text-xs text-green-700 font-semibold">¥${Number(r.amount).toLocaleString()}</span>` : ''}
+                ${r.date ? `<span class="text-xs text-gray-400">${esc(r.date)}</span>` : ''}
+              </div>
+              ${r.description ? `<div class="text-sm text-gray-800 mt-1">${esc(r.description)}</div>` : ''}
+            </div>
+            <div class="flex gap-1 shrink-0">
+              <select onchange="updateReferralResult(${r.id}, this.value, ${cid})" class="text-xs border rounded px-1 py-0.5">
+                <option ${r.result==='進行中'?'selected':''}>進行中</option>
+                <option ${r.result==='成約'?'selected':''}>成約</option>
+                <option ${r.result==='不成立'?'selected':''}>不成立</option>
+              </select>
+              <button onclick="deleteReferral(${r.id}, ${cid})" class="text-red-400 hover:text-red-600 text-lg leading-none px-1">&times;</button>
+            </div>
+          </div>`).join('')
+        : '<div class="text-sm text-gray-400">紹介履歴がありません</div>'}
+      </div>
+    </div>`;
+}
+
+async function addReferral(cid) {
+  const direction = document.getElementById('newRefDir').value;
+  const date = document.getElementById('newRefDate').value;
+  const description = document.getElementById('newRefDesc').value.trim();
+  const result = document.getElementById('newRefResult').value;
+  const amount = parseInt(document.getElementById('newRefAmount').value) || 0;
+  if (!description) return alert('紹介内容を入力してください');
+  await api('POST', '/contacts/'+cid+'/referrals', {direction, date, description, result, amount});
+  showTab(7);
+}
+
+async function updateReferralResult(rid, result, cid) {
+  const refs = await api('GET', '/contacts/'+cid+'/referrals');
+  const ref = refs.find(r => r.id === rid) || {};
+  await api('PUT', '/referrals/'+rid, {
+    direction: ref.direction || 'given',
+    date: ref.date || '',
+    description: ref.description || '',
+    result,
+    amount: ref.amount || 0
+  });
+  showTab(7);
+}
+
+async function deleteReferral(rid, cid) {
+  if (!confirm('削除しますか？')) return;
+  await api('DELETE', '/referrals/'+rid);
+  showTab(7);
+}
+
+function start121(cid, cname) {
+  const user = localStorage.getItem('bni_username') || 'admin';
+  const room = '121-' + user + '-' + cid + '-' + Date.now();
+  const url = new URL('https://meet.gaiaarts.org/');
+  url.searchParams.set('system', 'bni');
+  url.searchParams.set('bni_user', user);
+  url.searchParams.set('bni_contact_id', cid);
+  url.searchParams.set('bni_contact_name', cname);
+  url.searchParams.set('name', cname);
+  url.searchParams.set('room', room);
+  window.open(url.toString(), '_blank');
+}
+
+function renderOneOnOnes(records, cid) {
+  if (!records || records.length === 0) {
+    return `<div class='text-sm text-gray-400 py-4'>1-2-1の記録はまだありません。<br><br><button onclick='start121(${cid}, currentContactName)' class='mt-2 px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700'>🎙️ NiceMeetで1-2-1を開始</button></div>`;
+  }
+  const items = records.map(r => {
+    const date = r.meeting_date || r.created_at?.slice(0,10) || '';
+    const dur = r.duration_minutes ? Math.round(r.duration_minutes) + '分' : '';
+    return `<div class='border rounded-lg p-3 mb-3 bg-purple-50 border-purple-100'>
+      <div class='flex items-center justify-between mb-2'>
+        <div class='text-sm font-semibold text-purple-800'>${esc(date)} ${dur ? '（' + dur + '）' : ''}</div>
+        <span class='text-xs text-purple-500 bg-purple-100 px-2 py-0.5 rounded-full'>1-2-1</span>
+      </div>
+      ${r.summary ? "<div class='text-sm text-gray-700 mb-2 whitespace-pre-wrap'>" + esc(r.summary) + "</div>" : ''}
+      ${r.gains_goals||r.gains_accomplishments||r.gains_interests||r.gains_networks||r.gains_skills ? `
+      <div class='text-xs font-semibold text-gray-500 mb-1 mt-2'>GAINS</div>
+      <div class='text-xs text-gray-600 space-y-1'>
+        ${r.gains_goals ? '<div><span class=\'font-semibold\'>G:</span> ' + esc(r.gains_goals) + '</div>' : ''}
+        ${r.gains_accomplishments ? '<div><span class=\'font-semibold\'>A:</span> ' + esc(r.gains_accomplishments) + '</div>' : ''}
+        ${r.gains_interests ? '<div><span class=\'font-semibold\'>I:</span> ' + esc(r.gains_interests) + '</div>' : ''}
+        ${r.gains_networks ? '<div><span class=\'font-semibold\'>N:</span> ' + esc(r.gains_networks) + '</div>' : ''}
+        ${r.gains_skills ? '<div><span class=\'font-semibold\'>S:</span> ' + esc(r.gains_skills) + '</div>' : ''}
+      </div>` : ''}
+      ${r.referral_hints ? "<div class='text-xs text-green-700 mt-2 bg-green-50 rounded p-1.5'><span class='font-semibold'>紹介ヒント:</span> " + esc(r.referral_hints) + "</div>" : ''}
+      ${r.follow_up ? "<div class='text-xs text-orange-700 mt-1 bg-orange-50 rounded p-1.5'><span class='font-semibold'>フォローアップ:</span> " + esc(r.follow_up) + "</div>" : ''}
+    </div>`;
+  }).join('');
+  return `<div>${items}
+    <button onclick='start121(${cid}, currentContactName)' class='mt-2 w-full px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700'>🎙️ 新しい1-2-1を開始</button>
+  </div>`;
+}
+
+let currentContactName = '';
+
+function renderMatching(c) {
+  return `
+    <div>
+      <div class="flex items-start justify-between mb-4">
+        <div>
+          <div class="text-sm font-semibold text-gray-700">AIビジネスマッチング</div>
+          <div class="text-xs text-gray-400 mt-0.5">${esc(c.name)}さんと相性の良いメンバーをAIが分析します</div>
+        </div>
+        <button onclick="runMatching(${c.id})" id="matchBtn" class="text-sm bg-purple-600 text-white px-3 py-1.5 rounded-lg hover:bg-purple-700 whitespace-nowrap">
+          🤝 マッチング分析
+        </button>
+      </div>
+      <div id="matchResult">
+        <div class="text-sm text-gray-400 text-center py-8">「マッチング分析」ボタンを押すと、AIが相性の良いメンバーを分析します</div>
+      </div>
+    </div>`;
+}
+
+async function runMatching(cid) {
+  const btn = document.getElementById('matchBtn');
+  btn.textContent = '分析中...';
+  btn.disabled = true;
+  const resultEl = document.getElementById('matchResult');
+  resultEl.innerHTML = '<div class="text-sm text-gray-400 text-center py-8">AIが分析中です...</div>';
+  try {
+    const res = await api('POST', '/contacts/' + cid + '/match');
+    if (!res.matches || res.matches.length === 0) {
+      resultEl.innerHTML = '<div class="text-sm text-gray-400 text-center py-8">マッチング候補が見つかりませんでした。<br>コンタクトを2名以上登録すると分析できます。</div>';
+      return;
+    }
+    const scoreColor = i => i === 0 ? 'text-purple-600' : i === 1 ? 'text-blue-600' : 'text-gray-600';
+    const cardBorder = i => i === 0 ? 'border-purple-300 bg-purple-50' : 'border-gray-200 bg-gray-50';
+    resultEl.innerHTML = res.matches.map((m, i) => `
+      <div class="border rounded-xl p-4 mb-3 ${cardBorder(i)} cursor-pointer hover:shadow-sm transition" onclick="selectContact(${m.contact.id})">
+        <div class="flex items-start justify-between gap-2">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="font-bold text-gray-900">${i+1}位: ${esc(m.contact.name)}</span>
+              ${m.contact.category ? `<span class="text-xs text-white bg-gray-500 rounded-full px-2 py-0.5">${esc(m.contact.category)}</span>` : ''}
+            </div>
+            ${m.contact.company ? `<div class="text-xs text-gray-400 mt-0.5">${esc(m.contact.company)}</div>` : ''}
+          </div>
+          <div class="text-right shrink-0">
+            <div class="text-2xl font-bold ${scoreColor(i)}">${m.score}</div>
+            <div class="text-xs text-gray-400">/ 100</div>
+          </div>
+        </div>
+        <div class="mt-2 text-sm text-gray-700">${esc(m.reason)}</div>
+        ${m.referral_opportunity ? `<div class="mt-2 text-xs text-blue-700 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">💡 ${esc(m.referral_opportunity)}</div>` : ''}
+        <div class="mt-2 text-xs text-gray-400 text-right">タップして詳細を表示 →</div>
+      </div>`).join('');
+  } catch(e) {
+    resultEl.innerHTML = `<div class="text-sm text-red-600 bg-red-50 rounded-lg p-3">❌ ${esc(e.message)}</div>`;
+  } finally {
+    btn.innerHTML = '🤝 マッチング分析';
+    btn.disabled = false;
+  }
 }
 
 async function addMemo(cid) {
@@ -962,11 +1307,325 @@ async function saveImported() {
   if (contacts.length) selectContact(contacts[0].id);
 }
 
+// ── プロフィール取込 ──────────────────────────────────────
+let piData = null;
+let piTab = 'file';
+
+function openProfileImport() {
+  piData = null; piTab = 'file';
+  document.getElementById('profileImportModal').classList.remove('hidden');
+  document.getElementById('piPreview').classList.add('hidden');
+  document.getElementById('piError').classList.add('hidden');
+  document.getElementById('piSaveBtn').classList.add('hidden');
+  document.getElementById('piParseBtn').classList.remove('hidden');
+  document.getElementById('piFile').value = '';
+  document.getElementById('piUrl').value = '';
+  document.getElementById('piFileName').classList.add('hidden');
+  switchPiTab('file');
+}
+
+function closeProfileImport() {
+  document.getElementById('profileImportModal').classList.add('hidden');
+}
+
+function switchPiTab(tab) {
+  piTab = tab;
+  document.getElementById('piFileArea').classList.toggle('hidden', tab !== 'file');
+  document.getElementById('piUrlArea').classList.toggle('hidden', tab !== 'url');
+  document.getElementById('piTabFile').classList.toggle('tab-active', tab === 'file');
+  document.getElementById('piTabUrl').classList.toggle('tab-active', tab === 'url');
+}
+
+function onPiFileSelect(input) {
+  const file = input.files[0];
+  if (file) {
+    const el = document.getElementById('piFileName');
+    el.textContent = '📎 ' + file.name;
+    el.classList.remove('hidden');
+  }
+}
+
+async function runProfileImport() {
+  const btn = document.getElementById('piParseBtn');
+  btn.textContent = '解析中...'; btn.disabled = true;
+  document.getElementById('piError').classList.add('hidden');
+  document.getElementById('piPreview').classList.add('hidden');
+  try {
+    let res;
+    if (piTab === 'file') {
+      const file = document.getElementById('piFile').files[0];
+      if (!file) { alert('ファイルを選択してください'); return; }
+      const fd = new FormData();
+      fd.append('file', file);
+      const r = await fetch(BASE + 'api/import/file', { method: 'POST', body: fd, headers: {'Authorization': authToken} });
+      if (!r.ok) { let msg = r.statusText; try { msg = (await r.json()).detail || msg; } catch {} throw new Error(msg); }
+      res = await r.json();
+    } else {
+      const url = document.getElementById('piUrl').value.trim();
+      if (!url) { alert('URLを入力してください'); return; }
+      const fd = new FormData(); fd.append('url', url);
+      const r = await fetch(BASE + 'api/import/url', { method: 'POST', body: fd, headers: {'Authorization': authToken} });
+      if (!r.ok) { let msg = r.statusText; try { msg = (await r.json()).detail || msg; } catch {} throw new Error(msg); }
+      res = await r.json();
+    }
+    piData = res.parsed;
+    const rows = Object.entries(FIELD_LABELS)
+      .filter(([k]) => piData[k])
+      .map(([k, label]) => `<div class="flex gap-2 py-0.5"><span class="text-gray-500 w-28 shrink-0 text-xs">${label}</span><span class="text-gray-800 text-xs">${esc(String(piData[k]).substring(0, 120))}${String(piData[k]).length > 120 ? '…' : ''}</span></div>`);
+    document.getElementById('piPreviewContent').innerHTML = rows.length ? rows.join('') : '<div class="text-gray-400">取得できたデータがありません</div>';
+    document.getElementById('piPreview').classList.remove('hidden');
+    document.getElementById('piSaveBtn').classList.remove('hidden');
+  } catch(e) {
+    const el = document.getElementById('piError');
+    el.textContent = '❌ ' + e.message; el.classList.remove('hidden');
+  } finally {
+    btn.textContent = '🔍 解析'; btn.disabled = false;
+  }
+}
+
+function applyProfileImport() {
+  if (!piData) return;
+  const map = { name: 'mp_name', company: 'mp_company', chapter: 'mp_chapter',
+                category: 'mp_category', business_description: 'mp_business_description',
+                selling_points: 'mp_selling_points', target_customers: 'mp_target_customers',
+                referral_intro: 'mp_referral_intro' };
+  Object.entries(map).forEach(([field, elId]) => {
+    if (piData[field]) {
+      const el = document.getElementById(elId);
+      if (el) el.value = piData[field];
+    }
+  });
+  closeProfileImport();
+  alert('プロフィールに反映しました。内容を確認して「保存」を押してください。');
+}
+
+// ── カレンダー ────────────────────────────────────────────
+let calYear = new Date().getFullYear();
+let calMonth = new Date().getMonth() + 1;
+let calData = { reminders: [], meetings: [] };
+let calGoogleEvents = [];
+
+async function loadCalendar() {
+  const [bniData, gcalData] = await Promise.all([
+    api('GET', `/calendar?year=${calYear}&month=${calMonth}`),
+    gcalConnected ? api('GET', `/calendar/google?year=${calYear}&month=${calMonth}`) : Promise.resolve({ events: [], connected: false })
+  ]);
+  calData = bniData;
+  calGoogleEvents = gcalData.events || [];
+  const legend = document.getElementById('cal-gcal-legend');
+  if (legend) legend.classList.toggle('hidden', !gcalData.connected || !calGoogleEvents.length);
+  renderCalendar();
+}
+
+function calPrev() {
+  calMonth--;
+  if (calMonth < 1) { calMonth = 12; calYear--; }
+  loadCalendar();
+}
+
+function calNext() {
+  calMonth++;
+  if (calMonth > 12) { calMonth = 1; calYear++; }
+  loadCalendar();
+}
+
+function renderCalendar() {
+  document.getElementById('cal-title').textContent = `${calYear}年 ${calMonth}月`;
+  document.getElementById('cal-detail').classList.add('hidden');
+
+  // イベントを日付ごとにマップ
+  const eventMap = {};
+  calData.reminders.forEach(r => {
+    const d = r.remind_date;
+    if (!eventMap[d]) eventMap[d] = [];
+    eventMap[d].push({ type: 'reminder', ...r });
+  });
+  calData.meetings.forEach(m => {
+    const d = m.last_meeting_date;
+    if (!eventMap[d]) eventMap[d] = [];
+    eventMap[d].push({ type: 'meeting', ...m });
+  });
+  calGoogleEvents.forEach(e => {
+    const d = e.date;
+    if (!eventMap[d]) eventMap[d] = [];
+    eventMap[d].push({ type: 'gcal', ...e });
+  });
+
+  const firstDay = new Date(calYear, calMonth - 1, 1).getDay();
+  const daysInMonth = new Date(calYear, calMonth, 0).getDate();
+  const today = new Date().toISOString().substring(0, 10);
+
+  const grid = document.getElementById('cal-grid');
+  let html = '';
+
+  for (let i = 0; i < firstDay; i++) {
+    html += '<div class="min-h-[60px] border-b border-r border-gray-100 bg-gray-50"></div>';
+  }
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${calYear}-${String(calMonth).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const events = eventMap[dateStr] || [];
+    const isToday = dateStr === today;
+    const dow = (firstDay + d - 1) % 7;
+    const isSun = dow === 0, isSat = dow === 6;
+
+    const reminders = events.filter(e => e.type === 'reminder');
+    const meetings = events.filter(e => e.type === 'meeting');
+
+    html += `
+      <div class="min-h-[60px] border-b border-r border-gray-100 p-1 cursor-pointer hover:bg-blue-50 transition ${events.length ? 'bg-blue-50/30' : ''}"
+           onclick="showCalDay('${dateStr}')">
+        <div class="text-xs font-semibold mb-1 w-6 h-6 flex items-center justify-center rounded-full
+          ${isToday ? 'bg-blue-600 text-white' : isSun ? 'text-red-400' : isSat ? 'text-blue-400' : 'text-gray-700'}">
+          ${d}
+        </div>
+        <div class="flex flex-wrap gap-0.5">
+          ${reminders.map(() => `<span class="w-2 h-2 rounded-full bg-blue-500 inline-block"></span>`).join('')}
+          ${meetings.map(() => `<span class="w-2 h-2 rounded-full bg-green-500 inline-block"></span>`).join('')}
+          ${events.filter(e=>e.type==='gcal').map(() => `<span class="w-2 h-2 rounded-full bg-orange-400 inline-block"></span>`).join('')}
+        </div>
+        ${events.length ? `<div class="text-xs text-gray-500 mt-0.5 truncate leading-tight">${esc(events[0].contact_name || events[0].name || events[0].title || '')}</div>` : ''}
+      </div>`;
+  }
+
+  // 残りのセルを埋める
+  const total = firstDay + daysInMonth;
+  const remaining = total % 7 === 0 ? 0 : 7 - (total % 7);
+  for (let i = 0; i < remaining; i++) {
+    html += '<div class="min-h-[60px] border-b border-r border-gray-100 bg-gray-50"></div>';
+  }
+
+  grid.innerHTML = html;
+}
+
+function showCalDay(dateStr) {
+  const eventMap = {};
+  calData.reminders.forEach(r => {
+    if (!eventMap[r.remind_date]) eventMap[r.remind_date] = [];
+    eventMap[r.remind_date].push({ type: 'reminder', ...r });
+  });
+  calData.meetings.forEach(m => {
+    if (!eventMap[m.last_meeting_date]) eventMap[m.last_meeting_date] = [];
+    eventMap[m.last_meeting_date].push({ type: 'meeting', ...m });
+  });
+  calGoogleEvents.forEach(e => {
+    if (!eventMap[e.date]) eventMap[e.date] = [];
+    eventMap[e.date].push({ type: 'gcal', ...e });
+  });
+
+  const events = eventMap[dateStr] || [];
+  const detail = document.getElementById('cal-detail');
+  const dateObj = new Date(dateStr + 'T00:00:00');
+  const label = `${dateObj.getFullYear()}年${dateObj.getMonth()+1}月${dateObj.getDate()}日`;
+
+  document.getElementById('cal-detail-date').textContent = label;
+
+  if (!events.length) {
+    document.getElementById('cal-detail-content').innerHTML =
+      '<div class="text-sm text-gray-400">この日の予定はありません</div>';
+  } else {
+    document.getElementById('cal-detail-content').innerHTML = events.map(e => {
+      if (e.type === 'reminder') {
+        return `<div class="flex items-start gap-2 p-2 rounded-lg bg-blue-50 cursor-pointer hover:bg-blue-100" onclick="switchView('contacts');setTimeout(()=>selectContact(${e.contact_id}),100)">
+          <span class="w-2.5 h-2.5 rounded-full bg-blue-500 mt-1 shrink-0"></span>
+          <div>
+            <div class="text-sm font-medium text-gray-800">${esc(e.contact_name)}</div>
+            ${e.message ? `<div class="text-xs text-gray-500">${esc(e.message)}</div>` : ''}
+            <div class="text-xs text-gray-400">${e.done ? '✅ 完了' : '⏰ リマインダー'}</div>
+          </div>
+        </div>`;
+      } else if (e.type === 'meeting') {
+        return `<div class="flex items-start gap-2 p-2 rounded-lg bg-green-50 cursor-pointer hover:bg-green-100" onclick="switchView('contacts');setTimeout(()=>selectContact(${e.id}),100)">
+          <span class="w-2.5 h-2.5 rounded-full bg-green-500 mt-1 shrink-0"></span>
+          <div>
+            <div class="text-sm font-medium text-gray-800">${esc(e.name)}</div>
+            ${e.category ? `<div class="text-xs text-gray-500">${esc(e.category)}${e.company ? ' / ' + esc(e.company) : ''}</div>` : ''}
+            <div class="text-xs text-gray-400">🤝 1on1実施</div>
+          </div>
+        </div>`;
+      } else {
+        const timeStr = e.time ? new Date(e.time).toLocaleTimeString('ja-JP', {hour:'2-digit', minute:'2-digit'}) : '終日';
+        return `<div class="flex items-start gap-2 p-2 rounded-lg bg-orange-50 ${e.url ? 'cursor-pointer hover:bg-orange-100' : ''}" ${e.url ? `onclick="window.open('${e.url}','_blank')"` : ''}>
+          <span class="w-2.5 h-2.5 rounded-full bg-orange-400 mt-1 shrink-0"></span>
+          <div class="flex-1 min-w-0">
+            <div class="text-sm font-medium text-gray-800">${esc(e.title)}</div>
+            <div class="text-xs text-gray-400">🗓 ${timeStr}${e.url ? ' · タップで開く' : ''}</div>
+          </div>
+        </div>`;
+      }
+    }).join('');
+  }
+
+  detail.classList.remove('hidden');
+  detail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// ── Googleカレンダー連携 ──────────────────────────────────
+async function loadGcalStatus() {
+  try {
+    const d = await api('GET', '/auth/google/status');
+    gcalConnected = d.connected;
+    const statusEl = document.getElementById('gcal-status');
+    const connectBtn = document.getElementById('gcal-connect-btn');
+    const disconnectBtn = document.getElementById('gcal-disconnect-btn');
+    if (d.connected) {
+      statusEl.innerHTML = `<span class="text-green-600 font-medium">✅ 連携済み</span><span class="text-gray-400 text-xs ml-2">${d.connected_at || ''}</span>`;
+      connectBtn.classList.add('hidden');
+      disconnectBtn.classList.remove('hidden');
+    } else {
+      statusEl.textContent = '未連携';
+      connectBtn.classList.remove('hidden');
+      disconnectBtn.classList.add('hidden');
+    }
+  } catch(e) {}
+}
+
+function connectGoogleCalendar() {
+  window.location.href = BASE + 'api/auth/google/calendar?token=' + encodeURIComponent(authToken);
+}
+
+async function disconnectGoogleCalendar() {
+  if (!confirm('Googleカレンダーの連携を解除しますか？')) return;
+  await api('DELETE', '/auth/google/calendar');
+  gcalConnected = false;
+  loadGcalStatus();
+}
+
+async function syncReminderGoogle(rid) {
+  try {
+    const res = await api('POST', '/reminders/' + rid + '/sync-google');
+    if (res.event_url) {
+      if (confirm('Googleカレンダーに追加しました。カレンダーで確認しますか？')) {
+        window.open(res.event_url, '_blank');
+      }
+    }
+  } catch(e) {
+    alert('同期に失敗しました。設定画面でGoogleカレンダーを連携してください。');
+  }
+}
+
 // Init
 (async () => {
+  const params = new URLSearchParams(window.location.search);
   if (authToken && await checkAuth()) {
     document.getElementById('loginScreen').classList.add('hidden');
     loadContacts();
+    api('GET', '/auth/google/status').then(d => { gcalConnected = d.connected; }).catch(() => {});
+    if (params.get('google_connected') === '1') {
+      history.replaceState({}, '', window.location.pathname);
+      switchView('settings');
+      const msg = document.getElementById('gcal-msg');
+      msg.textContent = '✅ Googleカレンダーの連携が完了しました！';
+      msg.className = 'text-sm text-green-600';
+      msg.classList.remove('hidden');
+    } else if (params.get('google_error') === '1') {
+      history.replaceState({}, '', window.location.pathname);
+      switchView('settings');
+      const msg = document.getElementById('gcal-msg');
+      msg.textContent = '❌ 連携に失敗しました。もう一度お試しください。';
+      msg.className = 'text-sm text-red-600';
+      msg.classList.remove('hidden');
+    }
   }
 })();
 </script>
