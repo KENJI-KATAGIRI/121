@@ -18,7 +18,7 @@ import datetime
 app = FastAPI(title="BNI Manager")
 BASE_DIR = Path(__file__).parent
 DB_PATH = BASE_DIR / "data" / "bni.db"
-GOOGLE_REDIRECT_URI = "https://life-energy-coaching.net/bni/api/auth/google/callback"
+GOOGLE_REDIRECT_URI = "https://gaiaarts.org/bni/api/auth/google/callback"
 
 
 def get_db():
@@ -677,7 +677,7 @@ def google_calendar_connect(request: Request, token: str = ''):
 
 @app.get("/api/auth/google/callback")
 async def google_calendar_callback(code: str = None, state: str = None, error: str = None):
-    base_url = "https://life-energy-coaching.net/bni/"
+    base_url = "https://gaiaarts.org/bni/"
     if error or not code or not state:
         return RedirectResponse(base_url + "?google_error=1")
     uid = oauth_states.pop(state, None)
