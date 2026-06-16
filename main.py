@@ -21,6 +21,9 @@ import secrets
 import datetime
 import zipfile
 import io
+import stripe
+
+stripe.api_key = os.environ.get("STRIPE_SECRET_KEY", "")
 
 app = FastAPI(title="BNI Manager")
 BASE_DIR = Path(__file__).parent
@@ -507,6 +510,84 @@ def get_me(request: Request):
         "auth_type": row[3] or 'password', "plan": row[4] or 'free',
         "has_stripe": bool(row[5])
     }
+
+@app.post("/api/stripe/checkout")
+async def stripe_checkout(request: Request):
+    uid = get_uid(request)
+    conn = get_db()
+    row = conn.execute("SELECT email, display_name, stripe_customer_id FROM users WHERE id=?", (uid,)).fetchone()
+    if not row:
+        raise HTTPException(401, detail="unauthorized")
+    email, display_name, customer_id = row[0], row[1], row[2]
+    try:
+        if not customer_id:
+            customer = stripe.Customer.create(email=email or None, name=display_name or None,
+                                              metadata={"bni_user_id": str(uid)})
+            customer_id = customer.id
+            conn.execute("UPDATE users SET stripe_customer_id=? WHERE id=?", (customer_id, uid))
+            conn.commit()
+        conn.close()
+        session = stripe.checkout.Session.create(
+            customer=customer_id,
+            payment_method_types=["card"],
+            line_items=[{"price": os.environ.get("STRIPE_PRICE_ID",""), "quantity": 1}],
+            mode="subscription",
+            subscription_data={"trial_period_days": 30},
+            payment_method_collection="always",
+            success_url="https://gaiaarts.org/bni/?plan=success",
+            cancel_url="https://gaiaarts.org/bni/",
+            locale="ja",
+        )
+        return {"url": session.url}
+    except Exception as e:
+        raise HTTPException(500, detail=str(e))
+
+@app.post("/api/stripe/webhook")
+async def stripe_webhook(request: Request):
+    payload = await request.body()
+    sig = request.headers.get("stripe-signature", "")
+    webhook_secret = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
+    try:
+        if webhook_secret:
+            event = stripe.Webhook.construct_event(payload, sig, webhook_secret)
+        else:
+            event = json.loads(payload)
+    except Exception as e:
+        raise HTTPException(400, detail=str(e))
+    etype = event.get("type", "")
+    obj = event["data"]["object"]
+    customer_id = obj.get("customer")
+    if not customer_id:
+        return {"ok": True}
+    conn = get_db()
+    if etype == "customer.subscription.deleted" or etype == "invoice.payment_failed":
+        conn.execute("UPDATE users SET plan='free' WHERE stripe_customer_id=?", (customer_id,))
+    elif etype in ("customer.subscription.created", "customer.subscription.updated", "invoice.payment_succeeded"):
+        status = obj.get("status", "")
+        if status in ("active", "trialing"):
+            conn.execute("UPDATE users SET plan='paid' WHERE stripe_customer_id=?", (customer_id,))
+        elif status in ("canceled", "unpaid", "past_due"):
+            conn.execute("UPDATE users SET plan='free' WHERE stripe_customer_id=?", (customer_id,))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+@app.get("/api/stripe/portal")
+async def stripe_portal(request: Request):
+    uid = get_uid(request)
+    conn = get_db()
+    row = conn.execute("SELECT stripe_customer_id FROM users WHERE id=?", (uid,)).fetchone()
+    conn.close()
+    if not row or not row[0]:
+        raise HTTPException(400, detail="no subscription")
+    try:
+        session = stripe.billing_portal.Session.create(
+            customer=row[0],
+            return_url="https://gaiaarts.org/bni/",
+        )
+        return {"url": session.url}
+    except Exception as e:
+        raise HTTPException(500, detail=str(e))
 
 @app.post("/api/auth/change-password")
 def change_password(request: Request, data: ChangePwIn):
