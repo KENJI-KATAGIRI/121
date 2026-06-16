@@ -299,13 +299,16 @@
 <div id="view-settings" class="hidden flex-1 overflow-y-auto p-6 bg-gray-50">
   <div class="max-w-md mx-auto space-y-5">
     <h2 class="text-xl font-bold text-gray-800">アカウント設定</h2>
-    <div class="bg-white rounded-xl shadow p-5 space-y-4">
+    <div class="bg-white rounded-xl shadow p-5 space-y-4" id="pw-change-section">
       <h3 class="font-bold text-gray-700">パスワード変更</h3>
       <input id="s_current_pw" type="password" placeholder="現在のパスワード" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
       <input id="s_new_pw" type="password" placeholder="新しいパスワード（8文字以上）" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
       <input id="s_new_pw2" type="password" placeholder="新しいパスワード（確認）" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
       <div id="s_pw_msg" class="text-sm hidden"></div>
       <button onclick="changePassword()" class="w-full bg-indigo-600 text-white font-semibold py-2 rounded-lg hover:bg-indigo-700">パスワードを変更</button>
+    </div>
+    <div class="bg-blue-50 rounded-xl p-4 hidden" id="sso-info-section">
+      <p class="text-sm text-blue-700">🔗 <strong>NiceMeet連携中</strong> — ログインはNiceMeetから自動で行われます。</p>
     </div>
     <div class="bg-white rounded-xl shadow p-5 space-y-3">
       <h3 class="font-bold text-gray-700">🗓 Googleカレンダー連携</h3>
@@ -649,7 +652,16 @@ function switchView(view) {
   if (view === 'dashboard') { loadDashboard(); loadSuggestions(); }
   if (view === 'calendar') loadCalendar();
   if (view === 'myprofile') loadMyProfile();
-  if (view === 'settings') loadGcalStatus();
+  if (view === 'settings') { loadGcalStatus(); loadSettingsAuthType(); }
+}
+
+async function loadSettingsAuthType() {
+  try {
+    const me = await api('GET', '/me');
+    const isSso = me.auth_type === 'sso';
+    document.getElementById('pw-change-section').classList.toggle('hidden', isSso);
+    document.getElementById('sso-info-section').classList.toggle('hidden', !isSso);
+  } catch(e) {}
 }
 
 // ── ダッシュボード ─────────────────────────────────────────

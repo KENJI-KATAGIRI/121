@@ -137,6 +137,11 @@ def init_db():
     for sql in [
         "ALTER TABLE contacts ADD COLUMN user_id INTEGER DEFAULT 1",
         "ALTER TABLE one_on_ones ADD COLUMN follow_up TEXT DEFAULT ''",
+        "ALTER TABLE users ADD COLUMN auth_type TEXT DEFAULT 'password'",
+        "ALTER TABLE users ADD COLUMN email TEXT DEFAULT ''",
+        "ALTER TABLE users ADD COLUMN plan TEXT DEFAULT 'free'",
+        "ALTER TABLE users ADD COLUMN stripe_customer_id TEXT DEFAULT ''",
+        "ALTER TABLE users ADD COLUMN plan_expires TEXT DEFAULT NULL",
     ]:
         try: conn.execute(sql)
         except: pass
@@ -401,6 +406,7 @@ class RegisterIn(BaseModel):
     username: str
     display_name: str
     password: str
+    email: Optional[str] = ''
 
 class ChangePwIn(BaseModel):
     current_password: str
@@ -424,8 +430,8 @@ def register(data: RegisterIn):
     h, s = hash_pw(data.password)
     conn = get_db()
     try:
-        conn.execute("INSERT INTO users (username,display_name,pw_hash,pw_salt) VALUES (?,?,?,?)",
-                     (data.username.strip(), data.display_name.strip(), h, s))
+        conn.execute("INSERT INTO users (username,display_name,email,pw_hash,pw_salt,auth_type) VALUES (?,?,?,?,?,'password')",
+                     (data.username.strip(), data.display_name.strip(), (data.email or '').strip(), h, s))
         conn.commit()
     except sqlite3.IntegrityError:
         raise HTTPException(400, detail="そのユーザー名は既に使われています")
@@ -438,7 +444,6 @@ def sso_login(token: str):
     secret = os.environ.get("BNI_SSO_SECRET", "nicemeet-bni-sso-2026")
     try:
         payload_b64, sig = token.rsplit('.', 1)
-        # base64url decode with padding
         padding = 4 - len(payload_b64) % 4
         payload_str = base64.urlsafe_b64decode(payload_b64 + ('=' * (padding % 4))).decode()
         expected_sig = hmac.new(secret.encode(), payload_str.encode(), hashlib.sha256).hexdigest()
@@ -448,20 +453,35 @@ def sso_login(token: str):
         if payload.get('exp', 0) < time.time() * 1000:
             raise HTTPException(400, detail="token expired")
         name = payload.get('name', '').strip()
+        email = payload.get('email', '').strip()
         if not name:
             raise HTTPException(400, detail="name missing")
         conn = get_db()
-        row = conn.execute("SELECT id, display_name FROM users WHERE username=?", (name,)).fetchone()
+        # メールアドレス優先で既存ユーザーを検索（スタンドアロン→NiceMeet統合対応）
+        row = None
+        if email:
+            row = conn.execute("SELECT id, display_name, username FROM users WHERE email=?", (email,)).fetchone()
         if not row:
-            h, s_pw = hash_pw(secrets.token_hex(16))
-            conn.execute("INSERT INTO users (username, display_name, pw_hash, pw_salt) VALUES (?,?,?,?)",
-                         (name, name, h, s_pw))
+            row = conn.execute("SELECT id, display_name, username FROM users WHERE username=?", (name,)).fetchone()
+        if row:
+            # 既存ユーザーをSSO認証タイプに昇格
+            conn.execute("UPDATE users SET auth_type='sso', email=? WHERE id=?", (email, row[0]))
             conn.commit()
-            row = conn.execute("SELECT id, display_name FROM users WHERE username=?", (name,)).fetchone()
+            user_id, display_name, username = row[0], row[1] or name, row[2]
+        else:
+            # 新規ユーザー作成（SSO専用、ランダムパスワード）
+            h, s_pw = hash_pw(secrets.token_hex(16))
+            conn.execute(
+                "INSERT INTO users (username, display_name, email, pw_hash, pw_salt, auth_type) VALUES (?,?,?,?,?,'sso')",
+                (name, name, email, h, s_pw)
+            )
+            conn.commit()
+            row = conn.execute("SELECT id FROM users WHERE username=?", (name,)).fetchone()
+            user_id, display_name, username = row[0], name, name
         conn.close()
         session_token = secrets.token_hex(32)
-        active_sessions[session_token] = row[0]
-        return {"token": session_token, "display_name": row[1] or name, "username": name}
+        active_sessions[session_token] = user_id
+        return {"token": session_token, "display_name": display_name, "username": username}
     except HTTPException:
         raise
     except Exception as e:
@@ -471,6 +491,22 @@ def sso_login(token: str):
 def logout(request: Request):
     active_sessions.pop(request.headers.get('authorization',''), None)
     return {"ok": True}
+
+@app.get("/api/me")
+def get_me(request: Request):
+    uid = get_uid(request)
+    conn = get_db()
+    row = conn.execute(
+        "SELECT username, display_name, email, auth_type, plan, stripe_customer_id FROM users WHERE id=?", (uid,)
+    ).fetchone()
+    conn.close()
+    if not row:
+        raise HTTPException(401, detail="unauthorized")
+    return {
+        "username": row[0], "display_name": row[1], "email": row[2] or '',
+        "auth_type": row[3] or 'password', "plan": row[4] or 'free',
+        "has_stripe": bool(row[5])
+    }
 
 @app.post("/api/auth/change-password")
 def change_password(request: Request, data: ChangePwIn):
