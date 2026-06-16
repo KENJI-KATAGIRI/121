@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, HTMLResponse, RedirectResponse, StreamingResponse
 import urllib.parse
 from pydantic import BaseModel
 from typing import Optional
@@ -9,11 +9,18 @@ import sqlite3
 from pathlib import Path
 import os
 import json
+import urllib.request
+import json
 import tempfile
 import httpx
 import hashlib
+import hmac
+import time
+import base64
 import secrets
 import datetime
+import zipfile
+import io
 
 app = FastAPI(title="BNI Manager")
 BASE_DIR = Path(__file__).parent
@@ -39,7 +46,8 @@ def init_db():
             pw_hash TEXT NOT NULL,
             pw_salt TEXT NOT NULL,
             profile_data TEXT DEFAULT '{}',
-            created_at TEXT DEFAULT (datetime('now','localtime'))
+            created_at TEXT DEFAULT (datetime('now','localtime')),
+            cancelled_at TEXT DEFAULT NULL
         );
         CREATE TABLE IF NOT EXISTS contacts (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -424,6 +432,40 @@ def register(data: RegisterIn):
     finally:
         conn.close()
     return {"ok": True}
+
+@app.get("/api/auth/sso")
+def sso_login(token: str):
+    secret = os.environ.get("BNI_SSO_SECRET", "nicemeet-bni-sso-2026")
+    try:
+        payload_b64, sig = token.rsplit('.', 1)
+        # base64url decode with padding
+        padding = 4 - len(payload_b64) % 4
+        payload_str = base64.urlsafe_b64decode(payload_b64 + ('=' * (padding % 4))).decode()
+        expected_sig = hmac.new(secret.encode(), payload_str.encode(), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(sig, expected_sig):
+            raise HTTPException(400, detail="invalid token")
+        payload = json.loads(payload_str)
+        if payload.get('exp', 0) < time.time() * 1000:
+            raise HTTPException(400, detail="token expired")
+        name = payload.get('name', '').strip()
+        if not name:
+            raise HTTPException(400, detail="name missing")
+        conn = get_db()
+        row = conn.execute("SELECT id, display_name FROM users WHERE username=?", (name,)).fetchone()
+        if not row:
+            h, s_pw = hash_pw(secrets.token_hex(16))
+            conn.execute("INSERT INTO users (username, display_name, pw_hash, pw_salt) VALUES (?,?,?,?)",
+                         (name, name, h, s_pw))
+            conn.commit()
+            row = conn.execute("SELECT id, display_name FROM users WHERE username=?", (name,)).fetchone()
+        conn.close()
+        session_token = secrets.token_hex(32)
+        active_sessions[session_token] = row[0]
+        return {"token": session_token, "display_name": row[1] or name, "username": name}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(400, detail=str(e))
 
 @app.post("/api/auth/logout")
 def logout(request: Request):
@@ -1309,7 +1351,208 @@ async def nicemeet_webhook(request: Request):
                          list(updates.values()) + [contact_id])
             conn.commit()
     conn.close()
+
+    # R2にも保存（GAIADrive経由）
+    try:
+        import datetime, urllib.request, json as _json
+        drive_url = os.environ.get("DRIVE_INTERNAL_URL", "http://localhost:8309/api/internal/upload-json")
+        drive_secret = os.environ.get("DRIVE_INTERNAL_SECRET", "gaia-internal-2026")
+        today = datetime.date.today().isoformat()
+        safe_name = (data.get("contact_name","unknown") or "unknown").replace(" ", "_")
+        r2_key = f"1to1manager/one_on_ones/{today}/{data.get('bni_user','unknown')}-{safe_name}.json"
+        r2_body = _json.dumps({
+            "date": today,
+            "bni_user": data.get("bni_user",""),
+            "contact_name": data.get("contact_name",""),
+            "duration_minutes": data.get("duration_minutes", 0),
+            "transcript": data.get("transcript",""),
+            "summary": data.get("summary",""),
+            "gains": data.get("gains", {}),
+            "referral_hints": data.get("referral_hints",""),
+            "follow_up": data.get("follow_up","")
+        }, ensure_ascii=False, indent=2)
+        req = urllib.request.Request(
+            drive_url,
+            data=_json.dumps({"key": r2_key, "content": r2_body}).encode(),
+            headers={"Content-Type": "application/json", "x-internal-secret": drive_secret},
+            method="POST"
+        )
+        urllib.request.urlopen(req, timeout=5)
+    except Exception as e:
+        print(f"[R2 upload error] {e}")
+
     return {"ok": True}
+
+
+# ── データエクスポート ────────────────────────────────────────
+
+def build_viewer_html(contacts, one_on_ones):
+    contacts_json = json.dumps(contacts, ensure_ascii=False)
+    oo_json = json.dumps(one_on_ones, ensure_ascii=False)
+    today = datetime.date.today().isoformat()
+    return f"""<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>1to1 Manager - ローカルアーカイブ</title>
+<style>
+*{{margin:0;padding:0;box-sizing:border-box}}
+body{{font-family:'Segoe UI',system-ui,sans-serif;background:#0f172a;color:#f1f5f9;height:100vh;display:flex;flex-direction:column}}
+header{{background:#0f172a;border-bottom:1px solid rgba(255,255,255,0.07);padding:12px 20px;display:flex;align-items:center;gap:12px}}
+header h1{{background:linear-gradient(135deg,#a5b4fc,#8b5cf6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;font-size:1.1rem}}
+.badge{{font-size:11px;background:rgba(251,191,36,0.15);color:#fbbf24;border:1px solid rgba(251,191,36,0.3);padding:3px 8px;border-radius:20px}}
+.info{{margin-left:auto;font-size:12px;color:#64748b}}
+.layout{{display:flex;flex:1;overflow:hidden}}
+#sidebar{{width:280px;background:#1e293b;border-right:1px solid #334155;display:flex;flex-direction:column}}
+.search-wrap{{padding:12px}}
+#search{{width:100%;background:#0f172a;border:1px solid #334155;border-radius:8px;color:#f1f5f9;padding:8px 12px;font-size:13px;outline:none}}
+#search:focus{{border-color:#6366f1}}
+#search::placeholder{{color:#475569}}
+#contact-list{{flex:1;overflow-y:auto}}
+.c-item{{padding:12px 16px;border-bottom:1px solid #1e293b;cursor:pointer;transition:background .12s}}
+.c-item:hover{{background:#334155}}
+.c-item.active{{background:#1e1b4b;border-left:3px solid #6366f1}}
+.c-name{{font-size:13px;font-weight:600;color:#e2e8f0}}
+.c-meta{{font-size:11px;color:#64748b;margin-top:2px}}
+#detail{{flex:1;overflow-y:auto;padding:24px}}
+.placeholder{{display:flex;align-items:center;justify-content:center;height:100%;color:#475569;font-size:14px}}
+.d-header{{margin-bottom:20px}}
+.d-name{{font-size:1.3rem;font-weight:700;color:#e2e8f0;margin-bottom:4px}}
+.d-meta{{font-size:12px;color:#64748b}}
+.oo-card{{background:#1e293b;border:1px solid #334155;border-radius:12px;padding:16px;margin-bottom:14px}}
+.oo-date{{font-size:11px;color:#64748b;margin-bottom:8px;display:flex;gap:8px;align-items:center}}
+.oo-dur{{background:#1e1b4b;color:#a5b4fc;padding:2px 8px;border-radius:10px;font-size:11px}}
+.oo-summary{{font-size:13px;color:#cbd5e1;line-height:1.6;margin-bottom:12px}}
+.gains-grid{{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}}
+.gains-item{{background:#0f172a;border-radius:8px;padding:10px}}
+.gains-label{{font-size:10px;color:#8b5cf6;font-weight:700;letter-spacing:.5px;margin-bottom:4px}}
+.gains-val{{font-size:12px;color:#94a3b8;line-height:1.5}}
+.hint-block{{background:#0f172a;border-radius:8px;padding:10px;margin-top:8px}}
+.hint-label{{font-size:10px;color:#f59e0b;font-weight:700;margin-bottom:4px}}
+.hint-val{{font-size:12px;color:#94a3b8;line-height:1.5}}
+.transcript-toggle{{font-size:12px;color:#6366f1;cursor:pointer;margin-top:8px;display:block}}
+.transcript{{font-size:11px;color:#64748b;line-height:1.7;margin-top:8px;white-space:pre-wrap;display:none;background:#0f172a;padding:10px;border-radius:8px}}
+::-webkit-scrollbar{{width:4px}}::-webkit-scrollbar-thumb{{background:#334155;border-radius:4px}}
+</style>
+</head>
+<body>
+<header>
+  <span style="font-size:20px">🤝</span>
+  <h1>1to1 Manager</h1>
+  <span class="badge">📦 ローカルアーカイブ</span>
+  <span class="info">エクスポート日: {today}</span>
+</header>
+<div class="layout">
+  <div id="sidebar">
+    <div class="search-wrap">
+      <input id="search" placeholder="🔍 名前・会社で検索" oninput="filterContacts(this.value)">
+    </div>
+    <div id="contact-list"></div>
+  </div>
+  <div id="detail"><div class="placeholder">← コンタクトを選択してください</div></div>
+</div>
+<script>
+const CONTACTS = {contacts_json};
+const ONE_ON_ONES = {oo_json};
+let filtered = [...CONTACTS];
+let selected = null;
+
+function renderList(items) {{
+  const el = document.getElementById('contact-list');
+  if (!items.length) {{ el.innerHTML = '<div style="padding:20px;text-align:center;color:#475569;font-size:13px">見つかりません</div>'; return; }}
+  el.innerHTML = items.map(c => {{
+    const cnt = ONE_ON_ONES.filter(o => o.contact_id === c.id).length;
+    return `<div class="c-item${{selected===c.id?' active':''}}" onclick="selectContact(${{c.id}})">
+      <div class="c-name">${{c.name}}</div>
+      <div class="c-meta">${{c.company||''}}${{c.chapter?' · '+c.chapter:''}} · 1-2-1: ${{cnt}}回</div>
+    </div>`;
+  }}).join('');
+}}
+
+function filterContacts(q) {{
+  const lq = q.toLowerCase();
+  filtered = CONTACTS.filter(c => (c.name||'').toLowerCase().includes(lq)||(c.company||'').toLowerCase().includes(lq));
+  renderList(filtered);
+}}
+
+function selectContact(id) {{
+  selected = id;
+  renderList(filtered);
+  const c = CONTACTS.find(x => x.id===id);
+  const records = ONE_ON_ONES.filter(o => o.contact_id===id).sort((a,b)=>b.created_at?.localeCompare(a.created_at));
+  const el = document.getElementById('detail');
+  if (!c) return;
+  const gainsKeys = [['goals','目標・ゴール'],['accomplishments','実績'],['interests','興味・関心'],['networks','人脈'],['skills','スキル']];
+  el.innerHTML = `<div class="d-header">
+    <div class="d-name">${{c.name}}</div>
+    <div class="d-meta">${{c.company||''}}${{c.category?' · '+c.category:''}}${{c.chapter?' · '+c.chapter:''}}</div>
+  </div>` + (records.length ? records.map((r,i) => {{
+    const gains = gainsKeys.filter(([k]) => r['gains_'+k]).map(([k,label]) =>
+      `<div class="gains-item"><div class="gains-label">${{label}}</div><div class="gains-val">${{r['gains_'+k]}}</div></div>`).join('');
+    return `<div class="oo-card">
+      <div class="oo-date"><span>${{r.created_at?.slice(0,10)||''}}</span><span class="oo-dur">${{r.duration_minutes||0}}分</span></div>
+      ${{r.summary ? `<div class="oo-summary">${{r.summary}}</div>` : ''}}
+      ${{gains ? `<div class="gains-grid">${{gains}}</div>` : ''}}
+      ${{r.referral_hints ? `<div class="hint-block"><div class="hint-label">🔗 紹介ヒント</div><div class="hint-val">${{r.referral_hints}}</div></div>` : ''}}
+      ${{r.follow_up ? `<div class="hint-block"><div class="hint-label">📌 フォローアップ</div><div class="hint-val">${{r.follow_up}}</div></div>` : ''}}
+      ${{r.transcript ? `<span class="transcript-toggle" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">📄 文字起こしを表示/非表示</span><div class="transcript" style="display:none">${{r.transcript}}</div>` : ''}}
+    </div>`;
+  }}).join('') : '<div style="color:#475569;font-size:13px;margin-top:20px">1-2-1の記録がありません</div>');
+}}
+
+renderList(CONTACTS);
+</script>
+</body>
+</html>"""
+
+@app.get("/api/export/zip")
+def export_zip(request: Request):
+    uid = get_uid(request)
+    if not uid:
+        raise HTTPException(401, detail="Unauthorized")
+    conn = get_db()
+    contacts = [dict(r) for r in conn.execute(
+        "SELECT * FROM contacts WHERE user_id=? ORDER BY name", (uid,)).fetchall()]
+    one_on_ones = [dict(r) for r in conn.execute(
+        "SELECT * FROM one_on_ones WHERE user_id=? ORDER BY created_at DESC", (uid,)).fetchall()]
+    conn.close()
+
+    viewer = build_viewer_html(contacts, one_on_ones)
+    today = datetime.date.today().isoformat()
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr('viewer.html', viewer)
+        zf.writestr('data/contacts.json',
+            json.dumps(contacts, ensure_ascii=False, indent=2))
+        zf.writestr('data/one_on_ones.json',
+            json.dumps(one_on_ones, ensure_ascii=False, indent=2))
+        readme = f"""1to1 Manager データエクスポート
+エクスポート日: {today}
+
+■ ファイル構成
+viewer.html          ブラウザで開くと全データを閲覧できます（サーバー不要）
+data/contacts.json   コンタクト一覧（再インポート用）
+data/one_on_ones.json 1-2-1記録一覧（再インポート用）
+
+■ 使い方
+1. viewer.html をブラウザで開く
+2. 左のリストからコンタクトを選択
+3. 右に1-2-1の記録・GAINS・文字起こしが表示されます
+
+■ データ保持ポリシー
+・ご契約中: サーバー上に全データを保持
+・解約後:   90日間ダウンロード可能、その後サーバーから削除
+・R2バックアップ: 3年間保持
+"""
+        zf.writestr('README.txt', readme)
+    buf.seek(0)
+    return StreamingResponse(
+        buf,
+        media_type='application/zip',
+        headers={{'Content-Disposition': f'attachment; filename="1to1manager-{today}.zip"'}}
+    )
 
 @app.get("/api/contacts/{cid}/one-on-ones")
 def get_contact_one_on_ones(cid: int, request: Request):

@@ -3,45 +3,184 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BNI Manager</title>
+<title>1to1 Manager</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
-  .nav-btn { color: rgba(255,255,255,0.75); transition: all .15s; }
-  .nav-btn:hover { background: rgba(255,255,255,0.15); color: #fff; }
-  .nav-active { background: rgba(255,255,255,0.2) !important; color: #fff !important; font-weight:600; }
-  .tab-active { border-bottom: 2px solid #2563eb; color: #2563eb; font-weight:600; }
-  .tab-btn { padding: 8px 14px; font-size:14px; cursor:pointer; color:#6b7280; white-space:nowrap; }
-  .tab-btn:hover { color:#2563eb; }
+  /* ─── 1to1 Manager Design System ─── */
+  :root {
+    --p: #6366f1;
+    --p-dark: #4f46e5;
+    --p-light: #a5b4fc;
+    --dark: #0f172a;
+    --dark2: #1e293b;
+    --dark3: #334155;
+    --accent: #8b5cf6;
+  }
+
+  /* ─── Login ─── */
+  #loginScreen {
+    background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%) !important;
+  }
+  #loginScreen > div {
+    background: rgba(255,255,255,0.04) !important;
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,0.1) !important;
+    box-shadow: 0 32px 64px rgba(0,0,0,0.6) !important;
+  }
+  #loginScreen h1 {
+    background: linear-gradient(135deg, #a5b4fc, #8b5cf6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-size: 1.75rem !important;
+    letter-spacing: -0.02em;
+  }
+  #loginScreen p { color: rgba(255,255,255,0.4) !important; }
+  #loginScreen input {
+    background: rgba(255,255,255,0.06) !important;
+    border: 1px solid rgba(255,255,255,0.12) !important;
+    color: #fff !important;
+    border-radius: 10px !important;
+  }
+  #loginScreen input::placeholder { color: rgba(255,255,255,0.3) !important; }
+  #loginScreen input:focus { border-color: var(--p) !important; box-shadow: 0 0 0 3px rgba(99,102,241,0.2) !important; outline: none; }
+  #loginScreen .bg-indigo-600 { background: linear-gradient(135deg, var(--p), var(--accent)) !important; border: none; border-radius: 10px !important; font-size: 15px !important; letter-spacing: 0.02em; }
+  #loginScreen .bg-indigo-600:hover { opacity: 0.9; transform: translateY(-1px); box-shadow: 0 8px 24px rgba(99,102,241,0.4); }
+  #loginScreen .bg-green-600 { background: linear-gradient(135deg, #10b981, #059669) !important; border-radius: 10px !important; }
+  #loginScreen .text-indigo-600 { color: var(--p-light) !important; }
+  #loginScreen .text-gray-500 { color: rgba(255,255,255,0.4) !important; }
+  #loginScreen .text-red-500 { color: #f87171 !important; }
+
+  /* ─── Header ─── */
+  header {
+    background: var(--dark) !important;
+    border-bottom: 1px solid rgba(255,255,255,0.07) !important;
+    padding-top: 10px !important;
+    padding-bottom: 10px !important;
+  }
+  header h1 {
+    background: linear-gradient(135deg, #a5b4fc, #8b5cf6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-size: 1.1rem !important;
+    letter-spacing: -0.01em;
+  }
+  header .bg-indigo-500 { background: rgba(99,102,241,0.2) !important; color: #a5b4fc !important; border: 1px solid rgba(99,102,241,0.3) !important; }
+  header .bg-indigo-500:hover { background: rgba(99,102,241,0.35) !important; }
+  header .bg-white { background: linear-gradient(135deg, var(--p), var(--accent)) !important; color: #fff !important; border: none !important; }
+  header .bg-white:hover { opacity: 0.9; }
+  header .text-indigo-200 { color: rgba(255,255,255,0.4) !important; }
+  header .text-indigo-200:hover { color: rgba(255,255,255,0.8) !important; }
+
+  /* ─── Nav ─── */
+  .nav-btn { color: rgba(255,255,255,0.5); transition: all .15s; border-radius: 8px; font-size: 13px; }
+  .nav-btn:hover { background: rgba(255,255,255,0.08) !important; color: rgba(255,255,255,0.9) !important; }
+  .nav-active { background: rgba(99,102,241,0.25) !important; color: #a5b4fc !important; font-weight: 600; }
+
+  /* ─── Tabs ─── */
+  .tab-active { border-bottom: 2px solid var(--p); color: var(--p); font-weight: 600; }
+  .tab-btn { padding: 10px 14px; font-size: 13px; cursor: pointer; color: #94a3b8; white-space: nowrap; transition: color .15s; }
+  .tab-btn:hover { color: var(--p); }
+  #contactDetail .border-b.overflow-x-auto { background: #f8fafc; border-bottom: 1px solid #e2e8f0; }
+
+  /* ─── Sidebar ─── */
+  #sidebar { min-width: 280px; max-width: 280px; background: #f8fafc !important; border-right: 1px solid #e2e8f0 !important; }
+  #sidebar .border-b { border-color: #e2e8f0 !important; background: #fff; }
+  #sidebar input { border-color: #e2e8f0 !important; background: #f1f5f9 !important; border-radius: 10px !important; font-size: 13px !important; }
+  #sidebar input:focus { border-color: var(--p) !important; background: #fff !important; box-shadow: 0 0 0 3px rgba(99,102,241,0.12) !important; outline: none; }
+  .contact-item { border-bottom: 1px solid #f1f5f9; transition: background .12s; }
+  .contact-item:hover { background: #ede9fe !important; }
+  .contact-item.active { background: #e0e7ff !important; border-left: 3px solid var(--p); }
+
+  /* ─── Cards ─── */
+  .bg-white.rounded-xl.shadow,
+  .bg-white.rounded-xl.shadow-xl {
+    border: 1px solid #f1f5f9 !important;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04), 0 6px 20px rgba(0,0,0,0.05) !important;
+    border-radius: 14px !important;
+  }
+
+  /* ─── Dashboard stat cards ─── */
+  #view-dashboard .bg-white.rounded-xl {
+    background: linear-gradient(135deg, #fff 0%, #fafaff 100%) !important;
+  }
+
+  /* ─── Buttons (global) ─── */
+  .bg-indigo-600 { background: var(--p) !important; }
+  .bg-indigo-600:hover, .hover\:bg-indigo-700:hover { background: var(--p-dark) !important; }
+  .bg-green-600 { background: #059669 !important; }
+  .bg-green-600:hover, .hover\:bg-green-700:hover { background: #047857 !important; }
+  .bg-purple-600 { background: var(--accent) !important; }
+  .bg-purple-600:hover, .hover\:bg-purple-700:hover { background: #7c3aed !important; }
+  .text-indigo-600 { color: var(--p) !important; }
+  .text-indigo-700 { color: var(--p-dark) !important; }
+  .focus\:ring-blue-400:focus { --tw-ring-color: rgba(99,102,241,0.3); }
+  .border-indigo-400 { border-color: var(--p) !important; }
+
+  /* ─── Form inputs (global) ─── */
+  input[class*="border"], textarea[class*="border"] {
+    border-color: #e2e8f0 !important;
+    border-radius: 10px !important;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  input:focus, textarea:focus { border-color: var(--p) !important; box-shadow: 0 0 0 3px rgba(99,102,241,0.12) !important; outline: none; }
   textarea { resize: vertical; }
-  .contact-item:hover { background:#f0f4ff; }
-  .contact-item.active { background:#dbeafe; }
-  #sidebar { min-width:280px; max-width:280px; }
-  @media(max-width:768px){ #sidebar{ min-width:100%; max-width:100%; } #detail{ display:none; } #sidebar.hidden-mobile{ display:none; } #detail.show-mobile{ display:block !important; } }
+
+  /* ─── Detail panel ─── */
+  #contactDetail .p-4.border-b { background: #fff; border-bottom: 1px solid #f1f5f9; }
+  #contactDetail h2 { color: #0f172a !important; letter-spacing: -0.02em; }
+
+  /* ─── Tag badges ─── */
+  .bg-yellow-100 { background: #fef3c7 !important; }
+  .bg-green-100 { background: #d1fae5 !important; }
+  .bg-gray-100 { background: #f1f5f9 !important; }
+  .text-yellow-700 { color: #b45309 !important; }
+  .text-green-700 { color: #047857 !important; }
+  .bg-purple-50 { background: #f5f3ff !important; }
+  .border-purple-100 { border-color: #ede9fe !important; }
+  .text-purple-800 { color: #4c1d95 !important; }
+  .text-purple-500 { color: var(--accent) !important; }
+  .bg-purple-100 { background: #ede9fe !important; }
+
+  /* ─── Mobile ─── */
+  @media(max-width:768px) {
+    #sidebar { min-width:100%; max-width:100%; }
+    #detail { display:none; }
+    #sidebar.hidden-mobile { display:none; }
+    #detail.show-mobile { display:block !important; }
+  }
+
+  /* ─── Scrollbar ─── */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 </style>
 </head>
-<body class="bg-gray-50 h-screen flex flex-col">
+<body class="h-screen flex flex-col" style="background:#f8fafc">
 
 <!-- Login Screen -->
-<div id="loginScreen" class="fixed inset-0 bg-blue-700 flex items-center justify-center z-[100]">
-  <div class="bg-white rounded-2xl shadow-2xl p-8 w-80">
-    <h1 class="text-2xl font-bold text-center text-blue-700 mb-1">BNI Manager</h1>
-    <p class="text-xs text-center text-gray-400 mb-5">CONNECT & RECORD & SEARCH</p>
+<div id="loginScreen" class="fixed inset-0 flex items-center justify-center z-[100]" style="background:linear-gradient(135deg,#0f172a 0%,#1e1b4b 50%,#0f172a 100%)">
+  <div class="rounded-2xl p-8 w-80" style="background:rgba(255,255,255,0.06);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.15);box-shadow:0 32px 64px rgba(0,0,0,0.5)">
+    <div style="text-align:center;font-size:32px;margin-bottom:8px">🤝</div><h1 class="text-2xl font-bold text-center mb-1" style="background:linear-gradient(135deg,#a5b4fc,#8b5cf6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">1to1 Manager</h1>
+    <p class="text-xs text-center mb-5" style="color:rgba(255,255,255,0.4);letter-spacing:.12em" style="letter-spacing:.12em">1 on 1 · RECORD · CONNECT</p>
 
     <!-- Login Form -->
     <div id="loginForm" class="space-y-3">
-      <input id="loginUsername" type="text" placeholder="ユーザー名" class="w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
-      <input id="loginPassword" type="password" placeholder="パスワード" class="w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" onkeydown="if(event.key==='Enter')doLogin()">
+      <input id="loginUsername" type="text" placeholder="ユーザー名" class="w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+      <input id="loginPassword" type="password" placeholder="パスワード" class="w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" onkeydown="if(event.key==='Enter')doLogin()">
       <div id="loginError" class="text-red-500 text-xs hidden"></div>
-      <button onclick="doLogin()" class="w-full bg-blue-600 text-white font-semibold py-2.5 rounded-lg hover:bg-blue-700">ログイン</button>
-      <button onclick="showRegister()" class="w-full text-blue-600 text-sm hover:underline">新規アカウントを作成</button>
+      <button onclick="doLogin()" class="w-full text-white font-semibold py-2.5 rounded-xl" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);border:none;cursor:pointer;font-size:15px;letter-spacing:.02em">ログイン</button>
+      <button onclick="showRegister()" class="w-full text-indigo-600 text-sm hover:underline">新規アカウントを作成</button>
     </div>
 
     <!-- Register Form -->
     <div id="registerForm" class="space-y-3 hidden">
       <p class="text-sm font-semibold text-gray-700">新規アカウント作成</p>
-      <input id="regUsername" type="text" placeholder="ユーザー名（半角英数字）" class="w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
-      <input id="regDisplayName" type="text" placeholder="表示名（例：片桐健治）" class="w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
-      <input id="regPassword" type="password" placeholder="パスワード（6文字以上）" class="w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+      <input id="regUsername" type="text" placeholder="ユーザー名（半角英数字）" class="w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+      <input id="regDisplayName" type="text" placeholder="表示名（例：片桐健治）" class="w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+      <input id="regPassword" type="password" placeholder="パスワード（6文字以上）" class="w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
       <div id="regError" class="text-red-500 text-xs hidden"></div>
       <button onclick="doRegister()" class="w-full bg-green-600 text-white font-semibold py-2.5 rounded-lg hover:bg-green-700">アカウント作成</button>
       <button onclick="showLogin()" class="w-full text-gray-500 text-sm hover:underline">ログインに戻る</button>
@@ -50,10 +189,10 @@
 </div>
 
 <!-- Header -->
-<header class="bg-blue-600 text-white px-4 py-2.5 flex items-center justify-between shadow">
+<header class="text-white px-4 py-2.5 flex items-center justify-between" style="background:#0f172a;border-bottom:1px solid rgba(255,255,255,0.07)">
   <div class="flex items-center gap-3">
     <button id="backBtn" class="md:hidden text-white text-xl hidden" onclick="showList()">←</button>
-    <h1 class="font-bold text-lg">BNI Manager</h1>
+    <h1 class="font-bold text-lg" style="display:flex;align-items:center;gap:6px"><span style="font-size:18px">🤝</span><span style="background:linear-gradient(135deg,#a5b4fc,#8b5cf6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">1to1 Manager</span></h1>
   </div>
   <div class="flex items-center gap-2">
     <nav class="hidden md:flex gap-1 text-sm">
@@ -63,9 +202,10 @@
       <button onclick="switchView('myprofile')" id="nav-myprofile" class="nav-btn px-3 py-1.5 rounded-lg">👤 マイプロフィール</button>
       <button onclick="switchView('settings')" id="nav-settings" class="nav-btn px-3 py-1.5 rounded-lg">⚙ 設定</button>
     </nav>
-    <button onclick="openImportModal()" id="btn-import" class="bg-blue-500 hover:bg-blue-400 text-white font-semibold text-sm px-3 py-1.5 rounded-lg">📥 取込</button>
-    <button onclick="openAddModal()" id="btn-add" class="bg-white text-blue-600 font-semibold text-sm px-3 py-1.5 rounded-lg">+ 追加</button>
-    <button onclick="doLogout()" class="text-blue-200 hover:text-white text-sm px-2 py-1.5">ログアウト</button>
+    <button onclick="openImportModal()" id="btn-import" class="bg-indigo-500 hover:bg-blue-400 text-white font-semibold text-sm px-3 py-1.5 rounded-lg">📥 取込</button>
+    <button onclick="openAddModal()" id="btn-add" class="bg-white text-indigo-600 font-semibold text-sm px-3 py-1.5 rounded-lg">+ 追加</button>
+    <button onclick="exportZip()" class="text-sm px-3 py-1.5 rounded-lg font-medium" style="background:rgba(99,102,241,0.2);color:#a5b4fc;border:1px solid rgba(99,102,241,0.3)" title="全データをZIPでダウンロード">📦 データ保存</button>
+    <button onclick="doLogout()" class="text-indigo-200 hover:text-white text-sm px-2 py-1.5">ログアウト</button>
   </div>
 </header>
 
@@ -73,7 +213,7 @@
 <div id="view-dashboard" class="hidden flex-1 overflow-y-auto p-6 bg-gray-50">
   <h2 class="text-xl font-bold text-gray-800 mb-5">ダッシュボード</h2>
   <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-    <div class="bg-white rounded-xl shadow p-4 text-center"><div class="text-3xl font-bold text-blue-600" id="d-total">-</div><div class="text-xs text-gray-500 mt-1">総1to1数</div></div>
+    <div class="bg-white rounded-xl shadow p-4 text-center"><div class="text-3xl font-bold text-indigo-600" id="d-total">-</div><div class="text-xs text-gray-500 mt-1">総1to1数</div></div>
     <div class="bg-white rounded-xl shadow p-4 text-center"><div class="text-3xl font-bold text-orange-500" id="d-reminders">-</div><div class="text-xs text-gray-500 mt-1">リマインダー数</div></div>
     <div class="bg-white rounded-xl shadow p-4 text-center"><div class="text-3xl font-bold text-green-600" id="d-chapters">-</div><div class="text-xs text-gray-500 mt-1">チャプター数</div></div>
     <div class="bg-white rounded-xl shadow p-4 text-center"><div class="text-3xl font-bold text-purple-600" id="d-month">-</div><div class="text-xs text-gray-500 mt-1">今月の1to1</div></div>
@@ -103,7 +243,7 @@
       <button onclick="calNext()" class="text-gray-500 hover:text-gray-800 px-3 py-1.5 rounded-lg hover:bg-gray-200 text-lg">›</button>
     </div>
     <div class="flex gap-3 mb-3 text-xs flex-wrap">
-      <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-blue-500 inline-block"></span>リマインダー</span>
+      <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-indigo-500 inline-block"></span>リマインダー</span>
       <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-green-500 inline-block"></span>1on1実施</span>
       <span id="cal-gcal-legend" class="items-center gap-1 hidden"><span class="w-3 h-3 rounded-full bg-orange-400 inline-block"></span>Googleカレンダー</span>
     </div>
@@ -131,26 +271,26 @@
       <h2 class="text-xl font-bold text-gray-800">マイプロフィール</h2>
       <div class="flex gap-2">
         <button onclick="openProfileImport()" class="bg-green-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-green-700 font-semibold">📥 シートから取込</button>
-        <button onclick="saveMyProfile()" class="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700 font-semibold">保存</button>
+        <button onclick="saveMyProfile()" class="bg-indigo-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-indigo-700 font-semibold">保存</button>
       </div>
     </div>
     <div class="bg-white rounded-xl shadow p-5 space-y-4">
       <div class="grid grid-cols-2 gap-3">
-        <div class="col-span-2"><label class="text-xs font-semibold text-gray-500">名前</label><input id="mp_name" type="text" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></div>
-        <div><label class="text-xs font-semibold text-gray-500">会社名・屋号</label><input id="mp_company" type="text" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></div>
-        <div><label class="text-xs font-semibold text-gray-500">チャプター</label><input id="mp_chapter" type="text" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></div>
-        <div class="col-span-2"><label class="text-xs font-semibold text-gray-500">職種・カテゴリー</label><input id="mp_category" type="text" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></div>
+        <div class="col-span-2"><label class="text-xs font-semibold text-gray-500">名前</label><input id="mp_name" type="text" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"></div>
+        <div><label class="text-xs font-semibold text-gray-500">会社名・屋号</label><input id="mp_company" type="text" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"></div>
+        <div><label class="text-xs font-semibold text-gray-500">チャプター</label><input id="mp_chapter" type="text" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"></div>
+        <div class="col-span-2"><label class="text-xs font-semibold text-gray-500">職種・カテゴリー</label><input id="mp_category" type="text" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"></div>
       </div>
-      <div><label class="text-xs font-semibold text-gray-500">事業内容</label><textarea id="mp_business_description" rows="3" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></textarea></div>
-      <div><label class="text-xs font-semibold text-gray-500">独自の強み</label><textarea id="mp_selling_points" rows="3" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></textarea></div>
-      <div><label class="text-xs font-semibold text-gray-500">ターゲット顧客</label><textarea id="mp_target_customers" rows="3" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></textarea></div>
-      <div><label class="text-xs font-semibold text-gray-500">紹介の切り出し方</label><textarea id="mp_referral_intro" rows="3" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></textarea></div>
+      <div><label class="text-xs font-semibold text-gray-500">事業内容</label><textarea id="mp_business_description" rows="3" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"></textarea></div>
+      <div><label class="text-xs font-semibold text-gray-500">独自の強み</label><textarea id="mp_selling_points" rows="3" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"></textarea></div>
+      <div><label class="text-xs font-semibold text-gray-500">ターゲット顧客</label><textarea id="mp_target_customers" rows="3" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"></textarea></div>
+      <div><label class="text-xs font-semibold text-gray-500">紹介の切り出し方</label><textarea id="mp_referral_intro" rows="3" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"></textarea></div>
       <hr>
       <div class="flex items-center gap-3">
-        <div class="flex-1"><label class="text-xs font-semibold text-gray-500">公開URL スラッグ</label><div class="flex items-center gap-1 mt-1"><span class="text-xs text-gray-400">/bni/profile/</span><input id="mp_slug" type="text" placeholder="my-name" class="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></div></div>
+        <div class="flex-1"><label class="text-xs font-semibold text-gray-500">公開URL スラッグ</label><div class="flex items-center gap-1 mt-1"><span class="text-xs text-gray-400">/bni/profile/</span><input id="mp_slug" type="text" placeholder="my-name" class="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"></div></div>
         <div class="pt-5"><label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" id="mp_public" class="w-4 h-4 accent-blue-600"><span class="text-sm text-gray-700">公開する</span></label></div>
       </div>
-      <div id="mp_public_url" class="text-xs text-blue-600 hidden"></div>
+      <div id="mp_public_url" class="text-xs text-indigo-600 hidden"></div>
     </div>
   </div>
 </div>
@@ -161,18 +301,18 @@
     <h2 class="text-xl font-bold text-gray-800">アカウント設定</h2>
     <div class="bg-white rounded-xl shadow p-5 space-y-4">
       <h3 class="font-bold text-gray-700">パスワード変更</h3>
-      <input id="s_current_pw" type="password" placeholder="現在のパスワード" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
-      <input id="s_new_pw" type="password" placeholder="新しいパスワード（8文字以上）" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
-      <input id="s_new_pw2" type="password" placeholder="新しいパスワード（確認）" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+      <input id="s_current_pw" type="password" placeholder="現在のパスワード" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+      <input id="s_new_pw" type="password" placeholder="新しいパスワード（8文字以上）" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+      <input id="s_new_pw2" type="password" placeholder="新しいパスワード（確認）" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
       <div id="s_pw_msg" class="text-sm hidden"></div>
-      <button onclick="changePassword()" class="w-full bg-blue-600 text-white font-semibold py-2 rounded-lg hover:bg-blue-700">パスワードを変更</button>
+      <button onclick="changePassword()" class="w-full bg-indigo-600 text-white font-semibold py-2 rounded-lg hover:bg-indigo-700">パスワードを変更</button>
     </div>
     <div class="bg-white rounded-xl shadow p-5 space-y-3">
       <h3 class="font-bold text-gray-700">🗓 Googleカレンダー連携</h3>
       <p class="text-xs text-gray-500">連携するとリマインダー追加時に自動でGoogleカレンダーに予定が作成されます</p>
       <div id="gcal-status" class="text-sm text-gray-400">確認中...</div>
       <div id="gcal-connect-btn">
-        <button onclick="connectGoogleCalendar()" class="w-full bg-white border-2 border-gray-200 hover:border-blue-400 text-gray-700 font-semibold py-2 rounded-lg flex items-center justify-center gap-2 transition">
+        <button onclick="connectGoogleCalendar()" class="w-full bg-white border-2 border-gray-200 hover:border-indigo-400 text-gray-700 font-semibold py-2 rounded-lg flex items-center justify-center gap-2 transition">
           <svg class="w-5 h-5" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
           Googleカレンダーと連携する
         </button>
@@ -190,7 +330,7 @@
   <!-- Sidebar: Contact List -->
   <div id="sidebar" class="bg-white border-r flex flex-col overflow-hidden">
     <div class="p-3 border-b">
-      <input id="searchInput" type="text" placeholder="名前・会社名・カテゴリーで検索..." class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" oninput="onSearch(this.value)">
+      <input id="searchInput" type="text" placeholder="名前・会社名・カテゴリーで検索..." class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" oninput="onSearch(this.value)">
     </div>
     <div id="contactList" class="flex-1 overflow-y-auto"></div>
   </div>
@@ -208,7 +348,7 @@
 <!-- Import Modal -->
 <div id="importModal" class="fixed inset-0 bg-black bg-opacity-40 hidden z-50 overflow-y-auto">
   <div class="bg-white max-w-xl mx-auto my-10 rounded-xl shadow-xl overflow-hidden">
-    <div class="bg-blue-600 text-white px-6 py-4 flex items-center justify-between">
+    <div class="text-white px-6 py-4 flex items-center justify-between" style="background:linear-gradient(135deg,#4f46e5,#7c3aed)">
       <h2 class="font-bold text-lg">📥 ファイルから取込</h2>
       <button onclick="closeImportModal()" class="text-white text-2xl leading-none">&times;</button>
     </div>
@@ -222,19 +362,19 @@
 
       <!-- File upload area -->
       <div id="importFileArea">
-        <label class="block border-2 border-dashed border-gray-300 rounded-xl p-8 text-center cursor-pointer hover:border-blue-400 transition" id="dropZone">
+        <label class="block border-2 border-dashed border-gray-300 rounded-xl p-8 text-center cursor-pointer hover:border-indigo-400 transition" id="dropZone">
           <div class="text-4xl mb-2">📄</div>
           <div class="text-sm font-medium text-gray-700">PDF・Word・TXTをここにドロップ</div>
           <div class="text-xs text-gray-400 mt-1">またはクリックして選択</div>
           <input type="file" id="importFile" accept=".pdf,.docx,.doc,.txt" class="hidden" onchange="onFileSelect(this)">
         </label>
-        <div id="selectedFileName" class="text-sm text-blue-600 mt-2 hidden"></div>
+        <div id="selectedFileName" class="text-sm text-indigo-600 mt-2 hidden"></div>
       </div>
 
       <!-- URL input area -->
       <div id="importUrlArea" class="hidden">
         <label class="text-sm font-medium text-gray-700">Google Docs / Sheets の URL</label>
-        <input id="importUrl" type="text" placeholder="https://docs.google.com/document/d/..." class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+        <input id="importUrl" type="text" placeholder="https://docs.google.com/document/d/..." class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
         <div class="text-xs text-gray-400 mt-1">※「リンクを知っている全員が閲覧可能」に設定されている必要があります</div>
       </div>
 
@@ -253,7 +393,7 @@
     <div class="px-6 py-4 bg-gray-50 flex justify-between items-center">
       <button onclick="closeImportModal()" class="px-4 py-2 text-sm text-gray-600 border rounded-lg hover:bg-gray-100">キャンセル</button>
       <div class="flex gap-2">
-        <button id="importParseBtn" onclick="runImport()" class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold">🔍 解析</button>
+        <button id="importParseBtn" onclick="runImport()" class="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold">🔍 解析</button>
         <button id="importSaveBtn" onclick="saveImported()" class="hidden px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold">✅ この内容で登録</button>
       </div>
     </div>
@@ -298,7 +438,7 @@
       <button onclick="closeProfileImport()" class="px-4 py-2 text-sm text-gray-600 border rounded-lg hover:bg-gray-100">キャンセル</button>
       <div class="flex gap-2">
         <button id="piParseBtn" onclick="runProfileImport()" class="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold">🔍 解析</button>
-        <button id="piSaveBtn" onclick="applyProfileImport()" class="hidden px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold">✅ プロフィールに反映</button>
+        <button id="piSaveBtn" onclick="applyProfileImport()" class="hidden px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold">✅ プロフィールに反映</button>
       </div>
     </div>
   </div>
@@ -307,7 +447,7 @@
 <!-- Add/Edit Modal -->
 <div id="modal" class="fixed inset-0 bg-black bg-opacity-40 hidden z-50 overflow-y-auto">
   <div class="bg-white max-w-2xl mx-auto my-6 rounded-xl shadow-xl overflow-hidden">
-    <div class="bg-blue-600 text-white px-6 py-4 flex items-center justify-between">
+    <div class="text-white px-6 py-4 flex items-center justify-between" style="background:linear-gradient(135deg,#4f46e5,#7c3aed)">
       <h2 id="modalTitle" class="font-bold text-lg">人物を追加</h2>
       <button onclick="closeModal()" class="text-white text-2xl leading-none">&times;</button>
     </div>
@@ -317,27 +457,27 @@
       <div class="grid grid-cols-2 gap-3">
         <div class="col-span-2">
           <label class="text-sm font-medium text-gray-700">名前 *</label>
-          <input id="f_name" type="text" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+          <input id="f_name" type="text" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
         </div>
         <div>
           <label class="text-sm font-medium text-gray-700">よみがな</label>
-          <input id="f_reading" type="text" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+          <input id="f_reading" type="text" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
         </div>
         <div>
           <label class="text-sm font-medium text-gray-700">最終1on1日</label>
-          <input id="f_last_meeting_date" type="date" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+          <input id="f_last_meeting_date" type="date" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
         </div>
         <div>
           <label class="text-sm font-medium text-gray-700">会社名</label>
-          <input id="f_company" type="text" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+          <input id="f_company" type="text" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
         </div>
         <div>
           <label class="text-sm font-medium text-gray-700">チャプター名</label>
-          <input id="f_chapter" type="text" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+          <input id="f_chapter" type="text" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
         </div>
         <div class="col-span-2">
           <label class="text-sm font-medium text-gray-700">カテゴリー（職種）</label>
-          <input id="f_category" type="text" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+          <input id="f_category" type="text" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
         </div>
       </div>
 
@@ -346,43 +486,43 @@
       <div class="space-y-3">
         <div>
           <label class="text-sm font-medium text-gray-700">事業内容</label>
-          <textarea id="f_business_description" rows="3" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></textarea>
+          <textarea id="f_business_description" rows="3" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"></textarea>
         </div>
         <div class="grid grid-cols-2 gap-3">
-          <div><label class="text-sm font-medium text-gray-700">活動地域</label><input id="f_area" type="text" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></div>
-          <div><label class="text-sm font-medium text-gray-700">出身地</label><input id="f_birthplace" type="text" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></div>
-          <div><label class="text-sm font-medium text-gray-700">居住地</label><input id="f_residence" type="text" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></div>
-          <div><label class="text-sm font-medium text-gray-700">経験年数</label><input id="f_experience_years" type="text" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></div>
-          <div><label class="text-sm font-medium text-gray-700">配偶者</label><input id="f_spouse" type="text" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></div>
-          <div><label class="text-sm font-medium text-gray-700">家族構成</label><input id="f_family" type="text" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></div>
+          <div><label class="text-sm font-medium text-gray-700">活動地域</label><input id="f_area" type="text" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"></div>
+          <div><label class="text-sm font-medium text-gray-700">出身地</label><input id="f_birthplace" type="text" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"></div>
+          <div><label class="text-sm font-medium text-gray-700">居住地</label><input id="f_residence" type="text" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"></div>
+          <div><label class="text-sm font-medium text-gray-700">経験年数</label><input id="f_experience_years" type="text" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"></div>
+          <div><label class="text-sm font-medium text-gray-700">配偶者</label><input id="f_spouse" type="text" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"></div>
+          <div><label class="text-sm font-medium text-gray-700">家族構成</label><input id="f_family" type="text" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"></div>
         </div>
-        <div><label class="text-sm font-medium text-gray-700">前職</label><input id="f_previous_jobs" type="text" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></div>
-        <div><label class="text-sm font-medium text-gray-700">趣味</label><input id="f_hobbies" type="text" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></div>
+        <div><label class="text-sm font-medium text-gray-700">前職</label><input id="f_previous_jobs" type="text" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"></div>
+        <div><label class="text-sm font-medium text-gray-700">趣味</label><input id="f_hobbies" type="text" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"></div>
       </div>
 
       <hr>
       <p class="text-xs font-bold text-gray-500 uppercase tracking-wide">Power 1-2-1</p>
       <div class="space-y-3">
-        <div><label class="text-sm font-medium text-gray-700">独自のセールスポイント</label><textarea id="f_selling_points" rows="3" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></textarea></div>
-        <div><label class="text-sm font-medium text-gray-700">ターゲット顧客</label><textarea id="f_target_customers" rows="3" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></textarea></div>
-        <div><label class="text-sm font-medium text-gray-700">成功の鍵</label><textarea id="f_success_key" rows="2" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></textarea></div>
-        <div><label class="text-sm font-medium text-gray-700">紹介の切り出し方</label><textarea id="f_referral_intro" rows="3" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></textarea></div>
-        <div><label class="text-sm font-medium text-gray-700">お願いしたいこと</label><textarea id="f_request" rows="2" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></textarea></div>
+        <div><label class="text-sm font-medium text-gray-700">独自のセールスポイント</label><textarea id="f_selling_points" rows="3" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"></textarea></div>
+        <div><label class="text-sm font-medium text-gray-700">ターゲット顧客</label><textarea id="f_target_customers" rows="3" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"></textarea></div>
+        <div><label class="text-sm font-medium text-gray-700">成功の鍵</label><textarea id="f_success_key" rows="2" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"></textarea></div>
+        <div><label class="text-sm font-medium text-gray-700">紹介の切り出し方</label><textarea id="f_referral_intro" rows="3" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"></textarea></div>
+        <div><label class="text-sm font-medium text-gray-700">お願いしたいこと</label><textarea id="f_request" rows="2" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"></textarea></div>
       </div>
 
       <hr>
       <p class="text-xs font-bold text-gray-500 uppercase tracking-wide">GAINS</p>
       <div class="space-y-3">
-        <div><label class="text-sm font-medium text-gray-700">目標 (Goals)</label><textarea id="f_goals" rows="2" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></textarea></div>
-        <div><label class="text-sm font-medium text-gray-700">実績 (Accomplishments)</label><textarea id="f_accomplishments" rows="2" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></textarea></div>
-        <div><label class="text-sm font-medium text-gray-700">興味関心 (Interests)</label><textarea id="f_interests" rows="2" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></textarea></div>
-        <div><label class="text-sm font-medium text-gray-700">人脈 (Networks)</label><textarea id="f_networks" rows="2" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></textarea></div>
-        <div><label class="text-sm font-medium text-gray-700">スキル (Skills)</label><textarea id="f_skills" rows="2" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></textarea></div>
+        <div><label class="text-sm font-medium text-gray-700">目標 (Goals)</label><textarea id="f_goals" rows="2" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"></textarea></div>
+        <div><label class="text-sm font-medium text-gray-700">実績 (Accomplishments)</label><textarea id="f_accomplishments" rows="2" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"></textarea></div>
+        <div><label class="text-sm font-medium text-gray-700">興味関心 (Interests)</label><textarea id="f_interests" rows="2" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"></textarea></div>
+        <div><label class="text-sm font-medium text-gray-700">人脈 (Networks)</label><textarea id="f_networks" rows="2" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"></textarea></div>
+        <div><label class="text-sm font-medium text-gray-700">スキル (Skills)</label><textarea id="f_skills" rows="2" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"></textarea></div>
       </div>
     </div>
     <div class="px-6 py-4 bg-gray-50 flex justify-end gap-3">
       <button onclick="closeModal()" class="px-4 py-2 text-sm text-gray-600 border rounded-lg hover:bg-gray-100">キャンセル</button>
-      <button onclick="saveContact()" class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold">保存</button>
+      <button onclick="saveContact()" class="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold">保存</button>
     </div>
   </div>
 </div>
@@ -465,6 +605,28 @@ async function checkAuth() {
   } catch { return false; }
 }
 
+function exportZip() {
+  const a = document.createElement('a');
+  a.href = BASE + 'api/export/zip';
+  // Authヘッダーはfetchのみ対応のため、クエリパラメータでトークンを渡す
+  fetch(BASE + 'api/export/zip', { headers: { 'Authorization': authToken } })
+    .then(r => {
+      if (!r.ok) { alert('エクスポートに失敗しました'); return; }
+      return r.blob();
+    })
+    .then(blob => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const today = new Date().toISOString().slice(0,10);
+      a.href = url;
+      a.download = `1to1manager-${today}.zip`;
+      a.click();
+      URL.revokeObjectURL(url);
+    })
+    .catch(() => alert('ダウンロードエラーが発生しました'));
+}
+
 async function doLogout() {
   await fetch(BASE + 'api/auth/logout', { method:'POST', headers:{'Authorization':authToken} }).catch(()=>{});
   authToken = '';
@@ -507,7 +669,7 @@ async function loadDashboard() {
     chart.innerHTML = d.monthly.map(m => `
       <div class="flex flex-col items-center flex-1 gap-1">
         <div class="text-xs text-gray-500">${m.count}</div>
-        <div class="w-full bg-blue-500 rounded-t" style="height:${max>0?Math.max(4, Math.round(m.count/max*100)):4}px"></div>
+        <div class="w-full bg-indigo-500 rounded-t" style="height:${max>0?Math.max(4, Math.round(m.count/max*100)):4}px"></div>
         <div class="text-xs text-gray-400 whitespace-nowrap" style="font-size:10px">${m.month.substring(5)}月</div>
       </div>`).join('');
   } else {
@@ -531,7 +693,7 @@ async function loadSuggestions() {
   try {
     const data = await api('GET', '/suggestions/next-meetings');
     if (!data.length) { el.innerHTML = '<div class="text-sm text-gray-400">コンタクトを登録すると候補が表示されます</div>'; return; }
-    const urgencyColor = s => s >= 60 ? 'text-red-600' : s >= 35 ? 'text-orange-500' : 'text-blue-600';
+    const urgencyColor = s => s >= 60 ? 'text-red-600' : s >= 35 ? 'text-orange-500' : 'text-indigo-600';
     el.innerHTML = data.map(item => `
       <div class="flex items-center gap-3 py-2 border-b last:border-0 cursor-pointer hover:bg-gray-50 rounded-lg px-2" onclick="switchView('contacts');setTimeout(()=>selectContact(${item.contact.id}),100)">
         <div class="text-lg font-bold w-10 text-right shrink-0 ${urgencyColor(item.score)}">${item.score}</div>
@@ -792,8 +954,8 @@ function renderMemos(memos, cid) {
   return `
     <div class="mb-4">
       <div class="flex gap-2">
-        <textarea id="newMemo" rows="2" placeholder="メモを入力..." class="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></textarea>
-        <button onclick="addMemo(${cid})" class="bg-blue-600 text-white text-sm px-3 py-2 rounded-lg hover:bg-blue-700 whitespace-nowrap">追加</button>
+        <textarea id="newMemo" rows="2" placeholder="メモを入力..." class="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"></textarea>
+        <button onclick="addMemo(${cid})" class="bg-indigo-600 text-white text-sm px-3 py-2 rounded-lg hover:bg-indigo-700 whitespace-nowrap">追加</button>
       </div>
     </div>
     <div id="memoList">
@@ -813,9 +975,9 @@ function renderReminders(reminders, cid) {
   return `
     <div class="mb-4">
       <div class="flex gap-2 flex-wrap">
-        <input type="date" id="newReminderDate" class="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
-        <input type="text" id="newReminderMsg" placeholder="メモ（任意）" class="flex-1 min-w-0 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
-        <button onclick="addReminder(${cid})" class="bg-blue-600 text-white text-sm px-3 py-2 rounded-lg hover:bg-blue-700 whitespace-nowrap">追加</button>
+        <input type="date" id="newReminderDate" class="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+        <input type="text" id="newReminderMsg" placeholder="メモ（任意）" class="flex-1 min-w-0 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+        <button onclick="addReminder(${cid})" class="bg-indigo-600 text-white text-sm px-3 py-2 rounded-lg hover:bg-indigo-700 whitespace-nowrap">追加</button>
       </div>
     </div>
     <div id="reminderList">
@@ -826,7 +988,7 @@ function renderReminders(reminders, cid) {
             <div class="text-sm font-medium text-gray-800">${esc(r.remind_date)}</div>
             ${r.message?`<div class="text-xs text-gray-500">${esc(r.message)}</div>`:''}
           </div>
-          ${gcalConnected ? `<button onclick="syncReminderGoogle(${r.id})" title="Googleカレンダーに追加" class="text-blue-400 hover:text-blue-600 text-sm px-1">🗓</button>` : ''}
+          ${gcalConnected ? `<button onclick="syncReminderGoogle(${r.id})" title="Googleカレンダーに追加" class="text-blue-400 hover:text-indigo-600 text-sm px-1">🗓</button>` : ''}
           <button onclick="deleteReminder(${r.id},${cid})" class="text-red-400 hover:text-red-600 text-lg leading-none">&times;</button>
         </div>`).join('')
       : '<div class="text-sm text-gray-400">リマインダーがありません</div>'}
@@ -838,11 +1000,11 @@ function renderIntroduction(c) {
     <div class="mb-3">
       <div class="flex items-center justify-between mb-2">
         <span class="text-xs font-semibold text-gray-500">紹介文</span>
-        <button onclick="generateIntro(${c.id})" id="genBtn" class="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 flex items-center gap-1">
+        <button onclick="generateIntro(${c.id})" id="genBtn" class="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-700 flex items-center gap-1">
           ✨ AIで自動生成
         </button>
       </div>
-      <textarea id="introText" rows="8" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">${esc(c.introduction||'')}</textarea>
+      <textarea id="introText" rows="8" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">${esc(c.introduction||'')}</textarea>
       <button onclick="saveIntro(${c.id})" class="mt-2 text-sm bg-gray-800 text-white px-4 py-1.5 rounded-lg hover:bg-gray-700">保存</button>
     </div>`;
 }
@@ -854,7 +1016,7 @@ function renderReferrals(referrals, cid) {
     '不成立': 'bg-gray-100 text-gray-500'
   };
   const dirLabels = { given: '→ 相手に紹介', received: '← 紹介もらった' };
-  const dirColors = { given: 'text-blue-600', received: 'text-purple-600' };
+  const dirColors = { given: 'text-indigo-600', received: 'text-purple-600' };
 
   const totalGiven = referrals.filter(r => r.direction === 'given').length;
   const totalReceived = referrals.filter(r => r.direction === 'received').length;
@@ -864,28 +1026,28 @@ function renderReferrals(referrals, cid) {
     <div>
       ${referrals.length ? `
         <div class="flex gap-4 mb-4 text-sm">
-          <div class="bg-blue-50 rounded-lg px-3 py-2 text-center"><div class="font-bold text-blue-600">${totalGiven}</div><div class="text-xs text-gray-500">紹介した</div></div>
+          <div class="bg-indigo-50 rounded-lg px-3 py-2 text-center"><div class="font-bold text-indigo-600">${totalGiven}</div><div class="text-xs text-gray-500">紹介した</div></div>
           <div class="bg-purple-50 rounded-lg px-3 py-2 text-center"><div class="font-bold text-purple-600">${totalReceived}</div><div class="text-xs text-gray-500">紹介もらった</div></div>
           ${totalAmount ? `<div class="bg-green-50 rounded-lg px-3 py-2 text-center"><div class="font-bold text-green-600">¥${totalAmount.toLocaleString()}</div><div class="text-xs text-gray-500">成約合計</div></div>` : ''}
         </div>` : ''}
       <div class="mb-4 border rounded-xl p-3 bg-gray-50 space-y-2">
         <p class="text-xs font-semibold text-gray-500">新しい紹介を記録</p>
         <div class="grid grid-cols-2 gap-2">
-          <select id="newRefDir" class="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+          <select id="newRefDir" class="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
             <option value="given">→ 相手に紹介した</option>
             <option value="received">← 紹介してもらった</option>
           </select>
-          <input type="date" id="newRefDate" class="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+          <input type="date" id="newRefDate" class="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
         </div>
-        <input type="text" id="newRefDesc" placeholder="紹介内容（例：Web制作の案件を紹介）" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+        <input type="text" id="newRefDesc" placeholder="紹介内容（例：Web制作の案件を紹介）" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
         <div class="flex gap-2">
-          <select id="newRefResult" class="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+          <select id="newRefResult" class="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
             <option value="進行中">進行中</option>
             <option value="成約">成約</option>
             <option value="不成立">不成立</option>
           </select>
-          <input type="number" id="newRefAmount" placeholder="成約金額（円）" class="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
-          <button onclick="addReferral(${cid})" class="bg-blue-600 text-white text-sm px-3 py-2 rounded-lg hover:bg-blue-700 whitespace-nowrap">追加</button>
+          <input type="number" id="newRefAmount" placeholder="成約金額（円）" class="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+          <button onclick="addReferral(${cid})" class="bg-indigo-600 text-white text-sm px-3 py-2 rounded-lg hover:bg-indigo-700 whitespace-nowrap">追加</button>
         </div>
       </div>
       <div id="referralList">
@@ -1020,7 +1182,7 @@ async function runMatching(cid) {
       resultEl.innerHTML = '<div class="text-sm text-gray-400 text-center py-8">マッチング候補が見つかりませんでした。<br>コンタクトを2名以上登録すると分析できます。</div>';
       return;
     }
-    const scoreColor = i => i === 0 ? 'text-purple-600' : i === 1 ? 'text-blue-600' : 'text-gray-600';
+    const scoreColor = i => i === 0 ? 'text-purple-600' : i === 1 ? 'text-indigo-600' : 'text-gray-600';
     const cardBorder = i => i === 0 ? 'border-purple-300 bg-purple-50' : 'border-gray-200 bg-gray-50';
     resultEl.innerHTML = res.matches.map((m, i) => `
       <div class="border rounded-xl p-4 mb-3 ${cardBorder(i)} cursor-pointer hover:shadow-sm transition" onclick="selectContact(${m.contact.id})">
@@ -1038,7 +1200,7 @@ async function runMatching(cid) {
           </div>
         </div>
         <div class="mt-2 text-sm text-gray-700">${esc(m.reason)}</div>
-        ${m.referral_opportunity ? `<div class="mt-2 text-xs text-blue-700 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">💡 ${esc(m.referral_opportunity)}</div>` : ''}
+        ${m.referral_opportunity ? `<div class="mt-2 text-xs text-indigo-700 bg-indigo-50 border border-blue-100 rounded-lg px-3 py-2">💡 ${esc(m.referral_opportunity)}</div>` : ''}
         <div class="mt-2 text-xs text-gray-400 text-right">タップして詳細を表示 →</div>
       </div>`).join('');
   } catch(e) {
@@ -1209,11 +1371,11 @@ function onFileSelect(input) {
 document.addEventListener('DOMContentLoaded', () => {
   const zone = document.getElementById('dropZone');
   if (!zone) return;
-  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('border-blue-500','bg-blue-50'); });
-  zone.addEventListener('dragleave', () => { zone.classList.remove('border-blue-500','bg-blue-50'); });
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('border-blue-500','bg-indigo-50'); });
+  zone.addEventListener('dragleave', () => { zone.classList.remove('border-blue-500','bg-indigo-50'); });
   zone.addEventListener('drop', e => {
     e.preventDefault();
-    zone.classList.remove('border-blue-500','bg-blue-50');
+    zone.classList.remove('border-blue-500','bg-indigo-50');
     const file = e.dataTransfer.files[0];
     if (file) {
       document.getElementById('importFile').files = e.dataTransfer.files;
@@ -1473,14 +1635,14 @@ function renderCalendar() {
     const meetings = events.filter(e => e.type === 'meeting');
 
     html += `
-      <div class="min-h-[60px] border-b border-r border-gray-100 p-1 cursor-pointer hover:bg-blue-50 transition ${events.length ? 'bg-blue-50/30' : ''}"
+      <div class="min-h-[60px] border-b border-r border-gray-100 p-1 cursor-pointer hover:bg-indigo-50 transition ${events.length ? 'bg-indigo-50/30' : ''}"
            onclick="showCalDay('${dateStr}')">
         <div class="text-xs font-semibold mb-1 w-6 h-6 flex items-center justify-center rounded-full
-          ${isToday ? 'bg-blue-600 text-white' : isSun ? 'text-red-400' : isSat ? 'text-blue-400' : 'text-gray-700'}">
+          ${isToday ? 'bg-indigo-600 text-white' : isSun ? 'text-red-400' : isSat ? 'text-blue-400' : 'text-gray-700'}">
           ${d}
         </div>
         <div class="flex flex-wrap gap-0.5">
-          ${reminders.map(() => `<span class="w-2 h-2 rounded-full bg-blue-500 inline-block"></span>`).join('')}
+          ${reminders.map(() => `<span class="w-2 h-2 rounded-full bg-indigo-500 inline-block"></span>`).join('')}
           ${meetings.map(() => `<span class="w-2 h-2 rounded-full bg-green-500 inline-block"></span>`).join('')}
           ${events.filter(e=>e.type==='gcal').map(() => `<span class="w-2 h-2 rounded-full bg-orange-400 inline-block"></span>`).join('')}
         </div>
@@ -1526,8 +1688,8 @@ function showCalDay(dateStr) {
   } else {
     document.getElementById('cal-detail-content').innerHTML = events.map(e => {
       if (e.type === 'reminder') {
-        return `<div class="flex items-start gap-2 p-2 rounded-lg bg-blue-50 cursor-pointer hover:bg-blue-100" onclick="switchView('contacts');setTimeout(()=>selectContact(${e.contact_id}),100)">
-          <span class="w-2.5 h-2.5 rounded-full bg-blue-500 mt-1 shrink-0"></span>
+        return `<div class="flex items-start gap-2 p-2 rounded-lg bg-indigo-50 cursor-pointer hover:bg-indigo-100" onclick="switchView('contacts');setTimeout(()=>selectContact(${e.contact_id}),100)">
+          <span class="w-2.5 h-2.5 rounded-full bg-indigo-500 mt-1 shrink-0"></span>
           <div>
             <div class="text-sm font-medium text-gray-800">${esc(e.contact_name)}</div>
             ${e.message ? `<div class="text-xs text-gray-500">${esc(e.message)}</div>` : ''}
@@ -1607,6 +1769,28 @@ async function syncReminderGoogle(rid) {
 // Init
 (async () => {
   const params = new URLSearchParams(window.location.search);
+
+  // NiceMeet SSO自動ログイン
+  const ssoToken = params.get('sso_token');
+  if (ssoToken) {
+    try {
+      const r = await fetch(BASE + 'api/auth/sso?token=' + encodeURIComponent(ssoToken));
+      if (r.ok) {
+        const d = await r.json();
+        if (d.token) {
+          authToken = d.token;
+          localStorage.setItem('bni_token', authToken);
+          localStorage.setItem('bni_username', d.username);
+          history.replaceState({}, '', window.location.pathname);
+          document.getElementById('loginScreen').classList.add('hidden');
+          loadContacts();
+          api('GET', '/auth/google/status').then(d2 => { gcalConnected = d2.connected; }).catch(() => {});
+          return;
+        }
+      }
+    } catch(e) { console.error('SSO error:', e); }
+  }
+
   if (authToken && await checkAuth()) {
     document.getElementById('loginScreen').classList.add('hidden');
     loadContacts();
