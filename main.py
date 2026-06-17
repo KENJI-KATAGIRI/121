@@ -15,9 +15,11 @@ import tempfile
 import httpx
 import hashlib
 import hmac
+import html as _html
 import time
 import base64
 import secrets
+import re
 import datetime
 import zipfile
 import io
@@ -157,6 +159,9 @@ init_db()
 # ── 認証 ──────────────────────────────────────────────────
 active_sessions: dict = {}  # token -> user_id
 oauth_states: dict = {}     # state -> user_id (Google OAuth用)
+session_created: dict = {}  # token -> created_at
+SESSION_TTL = 86400 * 30   # 30日
+used_sso_tokens: set = set()  # JTIリプレイ攻撃防止
 
 def hash_pw(password: str, salt: str = None):
     if salt is None:
@@ -183,14 +188,26 @@ def init_default_user():
 init_default_user()
 
 def get_uid(request: Request) -> int:
-    return active_sessions.get(request.headers.get('authorization',''), 0)
+    import time as _time
+    token = request.headers.get('authorization', '')
+    uid = active_sessions.get(token, 0)
+    if uid and _time.time() - session_created.get(token, 0) > SESSION_TTL:
+        active_sessions.pop(token, None)
+        session_created.pop(token, None)
+        return 0
+    return uid
 
 class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
         open_paths = ('/api/auth/', '/profile/')
         if path.startswith('/api/') and not any(path.startswith(p) for p in open_paths):
-            if request.headers.get('authorization','') not in active_sessions:
+            import time as _time
+            _tok = request.headers.get('authorization','')
+            _expired = _tok in active_sessions and _time.time() - session_created.get(_tok, 0) > SESSION_TTL
+            if _expired:
+                active_sessions.pop(_tok, None); session_created.pop(_tok, None)
+            if _tok not in active_sessions:
                 return JSONResponse(status_code=401, content={"detail": "認証が必要です"})
         return await call_next(request)
 
@@ -327,16 +344,22 @@ def delete_contact(request: Request, cid: int):
 
 # ── Memos ─────────────────────────────────────────────────
 @app.get("/api/contacts/{cid}/memos")
-def list_memos(cid: int):
+def list_memos(request: Request, cid: int):
+    uid = get_uid(request)
     conn = get_db()
+    if not conn.execute("SELECT id FROM contacts WHERE id=? AND user_id=?", (cid, uid)).fetchone():
+        conn.close(); raise HTTPException(404)
     rows = conn.execute("SELECT * FROM memos WHERE contact_id=? ORDER BY created_at DESC", (cid,)).fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
 
 @app.post("/api/contacts/{cid}/memos", status_code=201)
-def create_memo(cid: int, m: MemoIn):
+def create_memo(request: Request, cid: int, m: MemoIn):
+    uid = get_uid(request)
     conn = get_db()
+    if not conn.execute("SELECT id FROM contacts WHERE id=? AND user_id=?", (cid, uid)).fetchone():
+        conn.close(); raise HTTPException(404)
     cur = conn.execute("INSERT INTO memos (contact_id,content) VALUES (?,?)", (cid, m.content))
     conn.commit()
     row = conn.execute("SELECT * FROM memos WHERE id=?", (cur.lastrowid,)).fetchone()
@@ -345,9 +368,10 @@ def create_memo(cid: int, m: MemoIn):
 
 
 @app.delete("/api/memos/{mid}")
-def delete_memo(mid: int):
+def delete_memo(request: Request, mid: int):
+    uid = get_uid(request)
     conn = get_db()
-    conn.execute("DELETE FROM memos WHERE id=?", (mid,))
+    conn.execute("DELETE FROM memos WHERE id=? AND contact_id IN (SELECT id FROM contacts WHERE user_id=?)", (mid, uid))
     conn.commit()
     conn.close()
     return {"ok": True}
@@ -355,8 +379,11 @@ def delete_memo(mid: int):
 
 # ── Reminders ─────────────────────────────────────────────
 @app.get("/api/contacts/{cid}/reminders")
-def list_reminders(cid: int):
+def list_reminders(request: Request, cid: int):
+    uid = get_uid(request)
     conn = get_db()
+    if not conn.execute("SELECT id FROM contacts WHERE id=? AND user_id=?", (cid, uid)).fetchone():
+        conn.close(); raise HTTPException(404)
     rows = conn.execute("SELECT * FROM reminders WHERE contact_id=? ORDER BY remind_date", (cid,)).fetchall()
     conn.close()
     return [dict(r) for r in rows]
@@ -381,9 +408,10 @@ async def create_reminder(request: Request, cid: int, r: ReminderIn):
 
 
 @app.put("/api/reminders/{rid}/toggle")
-def toggle_reminder(rid: int):
+def toggle_reminder(request: Request, rid: int):
+    uid = get_uid(request)
     conn = get_db()
-    conn.execute("UPDATE reminders SET done = 1 - done WHERE id=?", (rid,))
+    conn.execute("UPDATE reminders SET done = 1 - done WHERE id=? AND contact_id IN (SELECT id FROM contacts WHERE user_id=?)", (rid, uid))
     conn.commit()
     row = conn.execute("SELECT * FROM reminders WHERE id=?", (rid,)).fetchone()
     conn.close()
@@ -391,9 +419,10 @@ def toggle_reminder(rid: int):
 
 
 @app.delete("/api/reminders/{rid}")
-def delete_reminder(rid: int):
+def delete_reminder(request: Request, rid: int):
+    uid = get_uid(request)
     conn = get_db()
-    conn.execute("DELETE FROM reminders WHERE id=?", (rid,))
+    conn.execute("DELETE FROM reminders WHERE id=? AND contact_id IN (SELECT id FROM contacts WHERE user_id=?)", (rid, uid))
     conn.commit()
     conn.close()
     return {"ok": True}
@@ -402,49 +431,80 @@ def delete_reminder(rid: int):
 # ── 認証エンドポイント ────────────────────────────────────
 
 class LoginIn(BaseModel):
-    username: str
+    username: str  # メールアドレスまたは旧ユーザー名（後方互換）
     password: str
 
 class RegisterIn(BaseModel):
-    username: str
+    email: str
     display_name: str
     password: str
-    email: Optional[str] = ''
 
 class ChangePwIn(BaseModel):
     current_password: str
     new_password: str
 
+class ChangeEmailIn(BaseModel):
+    new_email: str
+
+def _valid_email(e: str) -> bool:
+    return bool(re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', e))
+
 @app.post("/api/auth/login")
 def login(data: LoginIn):
     conn = get_db()
-    row = conn.execute("SELECT id,pw_hash,pw_salt,display_name FROM users WHERE username=?", (data.username,)).fetchone()
+    identifier = data.username.strip()
+    # メールアドレスで検索（優先）→ 旧ユーザー名でフォールバック
+    row = conn.execute("SELECT id,pw_hash,pw_salt,display_name,username FROM users WHERE email=?", (identifier,)).fetchone()
+    if not row:
+        row = conn.execute("SELECT id,pw_hash,pw_salt,display_name,username FROM users WHERE username=?", (identifier,)).fetchone()
     conn.close()
     if not row or not verify_pw(data.password, row[1], row[2]):
-        raise HTTPException(401, detail="ユーザー名またはパスワードが違います")
+        raise HTTPException(401, detail="メールアドレスまたはパスワードが違います")
     token = secrets.token_hex(32)
     active_sessions[token] = row[0]
-    return {"token": token, "display_name": row[3], "username": data.username}
+    session_created[token] = __import__("time").time()
+    return {"token": token, "display_name": row[3], "username": row[4]}
 
 @app.post("/api/auth/register")
 def register(data: RegisterIn):
+    email = data.email.strip().lower()
+    if not _valid_email(email):
+        raise HTTPException(400, detail="有効なメールアドレスを入力してください")
     if len(data.password) < 6:
         raise HTTPException(400, detail="パスワードは6文字以上にしてください")
     h, s = hash_pw(data.password)
     conn = get_db()
     try:
+        # usernameもemailと同じ値にしてSSO統合しやすくする
         conn.execute("INSERT INTO users (username,display_name,email,pw_hash,pw_salt,auth_type) VALUES (?,?,?,?,?,'password')",
-                     (data.username.strip(), data.display_name.strip(), (data.email or '').strip(), h, s))
+                     (email, data.display_name.strip(), email, h, s))
         conn.commit()
     except sqlite3.IntegrityError:
-        raise HTTPException(400, detail="そのユーザー名は既に使われています")
+        raise HTTPException(400, detail="そのメールアドレスは既に登録されています")
     finally:
         conn.close()
     return {"ok": True}
 
+@app.put("/api/auth/email")
+def change_email(request: Request, data: ChangeEmailIn):
+    uid = get_uid(request)
+    new_email = data.new_email.strip().lower()
+    if not _valid_email(new_email):
+        raise HTTPException(400, detail="有効なメールアドレスを入力してください")
+    conn = get_db()
+    existing = conn.execute("SELECT id FROM users WHERE email=? AND id!=?", (new_email, uid)).fetchone()
+    if existing:
+        raise HTTPException(400, detail="そのメールアドレスは既に使われています")
+    conn.execute("UPDATE users SET email=? WHERE id=?", (new_email, uid))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
 @app.get("/api/auth/sso")
 def sso_login(token: str):
-    secret = os.environ.get("BNI_SSO_SECRET", "nicemeet-bni-sso-2026")
+    secret = os.environ.get("BNI_SSO_SECRET", "")
+    if not secret:
+        raise HTTPException(500, detail="SSO not configured")
     try:
         payload_b64, sig = token.rsplit('.', 1)
         padding = 4 - len(payload_b64) % 4
@@ -455,6 +515,10 @@ def sso_login(token: str):
         payload = json.loads(payload_str)
         if payload.get('exp', 0) < time.time() * 1000:
             raise HTTPException(400, detail="token expired")
+        # sigを一意キーとしてリプレイ攻撃を防止（NiceMeetトークンにjtiなし）
+        if sig in used_sso_tokens:
+            raise HTTPException(400, detail="invalid token")
+        used_sso_tokens.add(sig)
         name = payload.get('name', '').strip()
         email = payload.get('email', '').strip()
         if not name:
@@ -482,8 +546,10 @@ def sso_login(token: str):
             row = conn.execute("SELECT id FROM users WHERE username=?", (name,)).fetchone()
             user_id, display_name, username = row[0], name, name
         conn.close()
+        import time as _time
         session_token = secrets.token_hex(32)
         active_sessions[session_token] = user_id
+        session_created[session_token] = _time.time()
         return {"token": session_token, "display_name": display_name, "username": username}
     except HTTPException:
         raise
@@ -683,14 +749,14 @@ def public_profile_page(slug: str):
     p = json.loads(data)
     if not p.get('public', False):
         return HTMLResponse("<h2>このプロフィールは非公開です</h2>", status_code=403)
-    name = p.get('name','')
-    category = p.get('category','')
-    company = p.get('company','')
-    chapter = p.get('chapter','')
-    business = p.get('business_description','').replace('\n','<br>')
-    selling = p.get('selling_points','').replace('\n','<br>')
-    target = p.get('target_customers','').replace('\n','<br>')
-    referral = p.get('referral_intro','').replace('\n','<br>')
+    name = _html.escape(p.get('name',''))
+    category = _html.escape(p.get('category',''))
+    company = _html.escape(p.get('company',''))
+    chapter = _html.escape(p.get('chapter',''))
+    business = _html.escape(p.get('business_description','')).replace('\n','<br>')
+    selling = _html.escape(p.get('selling_points','')).replace('\n','<br>')
+    target = _html.escape(p.get('target_customers','')).replace('\n','<br>')
+    referral = _html.escape(p.get('referral_intro','')).replace('\n','<br>')
     html = f"""<!DOCTYPE html>
 <html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{name} | BNI プロフィール</title>
@@ -902,8 +968,11 @@ async def sync_reminder_google(request: Request, rid: int):
 
 # ── Referrals ─────────────────────────────────────────────
 @app.get("/api/contacts/{cid}/referrals")
-def list_referrals(cid: int):
+def list_referrals(request: Request, cid: int):
+    uid = get_uid(request)
     conn = get_db()
+    if not conn.execute("SELECT id FROM contacts WHERE id=? AND user_id=?", (cid, uid)).fetchone():
+        conn.close(); raise HTTPException(404)
     rows = conn.execute(
         "SELECT * FROM referrals WHERE contact_id=? ORDER BY date DESC, created_at DESC", (cid,)
     ).fetchall()
@@ -926,11 +995,12 @@ def create_referral(request: Request, cid: int, r: ReferralIn):
 
 
 @app.put("/api/referrals/{rid}")
-def update_referral(rid: int, r: ReferralIn):
+def update_referral(request: Request, rid: int, r: ReferralIn):
+    uid = get_uid(request)
     conn = get_db()
     conn.execute(
-        "UPDATE referrals SET direction=?,date=?,description=?,result=?,amount=? WHERE id=?",
-        (r.direction, r.date, r.description, r.result, r.amount, rid)
+        "UPDATE referrals SET direction=?,date=?,description=?,result=?,amount=? WHERE id=? AND user_id=?",
+        (r.direction, r.date, r.description, r.result, r.amount, rid, uid)
     )
     conn.commit()
     row = conn.execute("SELECT * FROM referrals WHERE id=?", (rid,)).fetchone()
@@ -939,9 +1009,10 @@ def update_referral(rid: int, r: ReferralIn):
 
 
 @app.delete("/api/referrals/{rid}")
-def delete_referral(rid: int):
+def delete_referral(request: Request, rid: int):
+    uid = get_uid(request)
     conn = get_db()
-    conn.execute("DELETE FROM referrals WHERE id=?", (rid,))
+    conn.execute("DELETE FROM referrals WHERE id=? AND user_id=?", (rid, uid))
     conn.commit()
     conn.close()
     return {"ok": True}
@@ -1707,6 +1778,12 @@ app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="stat
 @app.get("/")
 def root():
     return FileResponse(str(BASE_DIR / "static" / "index.html"))
+
+
+@app.get("/lp")
+@app.get("/lp.html")
+def lp_page():
+    return FileResponse(str(BASE_DIR / "static" / "lp.html"))
 
 
 @app.get("/{path:path}")
