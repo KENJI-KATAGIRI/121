@@ -782,9 +782,11 @@ def public_profile_page(slug: str):
 
 # ── AI 紹介文生成 ─────────────────────────────────────────
 @app.post("/api/contacts/{cid}/generate-introduction")
-def generate_introduction(cid: int):
+def generate_introduction(cid: int, request: Request):
+    uid = get_uid(request)
+    if not uid: raise HTTPException(401)
     conn = get_db()
-    row = conn.execute("SELECT * FROM contacts WHERE id=?", (cid,)).fetchone()
+    row = conn.execute("SELECT * FROM contacts WHERE id=? AND user_id=?", (cid, uid)).fetchone()
     conn.close()
     if not row:
         raise HTTPException(404)
@@ -1365,7 +1367,8 @@ JSONのみ返してください。"""
 
 
 @app.post("/api/import/file")
-async def import_file(file: UploadFile = File(...)):
+async def import_file(request: Request, file: UploadFile = File(...)):
+    if not get_uid(request): raise HTTPException(401)
     suffix = Path(file.filename).suffix.lower()
     if suffix not in ('.pdf', '.docx', '.doc', '.txt'):
         raise HTTPException(400, detail="対応形式: PDF, DOCX, TXT")
@@ -1416,7 +1419,10 @@ def extract_text_from_xlsx(data: bytes) -> str:
 
 
 @app.post("/api/import/url")
-async def import_url(url: str = Form(...)):
+async def import_url(request: Request, url: str = Form(...)):
+    if not get_uid(request): raise HTTPException(401)
+    if 'docs.google.com/document' not in url and 'docs.google.com/spreadsheets' not in url:
+        raise HTTPException(400, detail="Google DocsまたはSpreadsheetのURLのみ対応しています")
     export_url = url
     is_sheets = 'docs.google.com/spreadsheets' in url
 
@@ -1458,7 +1464,7 @@ async def import_url(url: str = Form(...)):
 @app.post("/api/nicemeet-contact")
 async def nicemeet_contact(request: Request):
     secret = request.headers.get("x-nicemeet-secret", "")
-    expected = os.environ.get("NICEMEET_WEBHOOK_SECRET", "nicemeet-bni-2026")
+    expected = os.environ.get("NICEMEET_WEBHOOK_SECRET") or ""
     if secret != expected:
         raise HTTPException(403, detail="forbidden")
     data = await request.json()
@@ -1504,7 +1510,7 @@ async def nicemeet_contact(request: Request):
 @app.post("/api/nicemeet-webhook")
 async def nicemeet_webhook(request: Request):
     secret = request.headers.get("x-nicemeet-secret", "")
-    expected = os.environ.get("NICEMEET_WEBHOOK_SECRET", "nicemeet-bni-2026")
+    expected = os.environ.get("NICEMEET_WEBHOOK_SECRET") or ""
     if secret != expected:
         raise HTTPException(403, detail="forbidden")
     data = await request.json()
