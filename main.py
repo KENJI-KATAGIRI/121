@@ -393,7 +393,9 @@ def list_reminders(request: Request, cid: int):
 async def create_reminder(request: Request, cid: int, r: ReminderIn):
     uid = get_uid(request)
     conn = get_db()
-    contact = conn.execute("SELECT name FROM contacts WHERE id=?", (cid,)).fetchone()
+    contact = conn.execute("SELECT name FROM contacts WHERE id=? AND user_id=?", (cid, uid)).fetchone()
+    if not contact:
+        conn.close(); raise HTTPException(404)
     cur = conn.execute("INSERT INTO reminders (contact_id,remind_date,message) VALUES (?,?,?)",
                        (cid, r.remind_date, r.message))
     conn.commit()
@@ -558,7 +560,9 @@ def sso_login(token: str):
 
 @app.post("/api/auth/logout")
 def logout(request: Request):
-    active_sessions.pop(request.headers.get('authorization',''), None)
+    token = request.headers.get('authorization', '')
+    active_sessions.pop(token, None)
+    session_created.pop(token, None)
     return {"ok": True}
 
 @app.get("/api/me")
