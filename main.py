@@ -1781,6 +1781,41 @@ def get_all_one_on_ones(request: Request):
     conn.close()
     return [dict(r) for r in rows]
 
+
+@app.post("/api/upgrade-request")
+def upgrade_request(request: Request):
+    uid = get_uid(request)
+    with get_db() as conn:
+        user = conn.execute("SELECT display_name, email FROM users WHERE id=?", (uid,)).fetchone()
+    if not user:
+        raise HTTPException(404)
+    import smtplib, os as _os
+    from email.message import EmailMessage
+    gmail_user = _os.environ.get("GMAIL_USER", "")
+    gmail_pass = _os.environ.get("GMAIL_PASS", "")
+    admin_email = _os.environ.get("ADMIN_EMAIL", "kenji.kys@gmail.com")
+    if gmail_user and gmail_pass:
+        try:
+            body = (
+                "BNI ManagerユーザーからNiceMeetへのアップグレード申請が届きました。\n\n"
+                "ユーザー名: " + str(user[0]) + "\n"
+                "メールアドレス: " + str(user[1]) + "\n\n"
+                "NiceMeetアカウント（同じメールアドレス）を作成してお知らせください。\n"
+                "https://meet.gaiaarts.org/"
+            )
+            subject = "[BNI Manager] NiceMeetアップグレード申請: " + str(user[0])
+            msg = EmailMessage()
+            msg["Subject"] = subject
+            msg["From"] = gmail_user
+            msg["To"] = admin_email
+            msg.set_content(body)
+            with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
+                smtp.login(gmail_user, gmail_pass)
+                smtp.send_message(msg)
+        except Exception as e:
+            print(f"[upgrade-request] mail error: {e}")
+    return {"ok": True}
+
 # ── Static / SPA ─────────────────────────────────────────
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 
