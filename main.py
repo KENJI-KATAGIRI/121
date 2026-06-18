@@ -27,6 +27,15 @@ import stripe
 
 stripe.api_key = os.environ.get("STRIPE_SECRET_KEY", "")
 
+# .env を起動時に読み込み（systemd EnvironmentFile なしでも動作）
+_env_file = Path(__file__).parent / '.env'
+if _env_file.exists():
+    for _line in _env_file.read_text().splitlines():
+        _line = _line.strip()
+        if _line and not _line.startswith('#') and '=' in _line:
+            _k, _v = _line.split('=', 1)
+            os.environ.setdefault(_k.strip(), _v.strip())
+
 app = FastAPI(title="BNI Manager")
 BASE_DIR = Path(__file__).parent
 DB_PATH = BASE_DIR / "data" / "bni.db"
