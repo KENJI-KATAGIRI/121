@@ -169,19 +169,44 @@ init_db()
 
 # ── 認証 ──────────────────────────────────────────────────
 active_sessions: dict = {}  # token -> user_id
-oauth_states: dict = {}     # state -> user_id (Google OAuth用)
+oauth_states: dict = {}     # state -> (user_id, created_at) Google OAuth用
 session_created: dict = {}  # token -> created_at
 SESSION_TTL = 86400 * 30   # 30日
-used_sso_tokens: set = set()  # JTIリプレイ攻撃防止
+used_sso_tokens: dict = {}  # sig -> created_at (JTIリプレイ攻撃防止)
+
+_auth_attempts: dict = {}  # ip -> [timestamp, ...]
+AUTH_RATE_WINDOW = 900
+AUTH_RATE_MAX = 20
+
+def _check_auth_rate(request: Request) -> bool:
+    import time as _t
+    ip = (request.headers.get('x-forwarded-for', '') or (request.client.host if request.client else 'unknown')).split(',')[0].strip()
+    now = _t.time()
+    attempts = [ts for ts in _auth_attempts.get(ip, []) if now - ts < AUTH_RATE_WINDOW]
+    attempts.append(now)
+    _auth_attempts[ip] = attempts
+    if len(_auth_attempts) > 5000:
+        cutoff = now - AUTH_RATE_WINDOW
+        for k in [k for k, v in list(_auth_attempts.items()) if not any(ts > cutoff for ts in v)]:
+            del _auth_attempts[k]
+    return len(attempts) <= AUTH_RATE_MAX
+
+PBKDF2_ITERS = 100000
 
 def hash_pw(password: str, salt: str = None):
     if salt is None:
         salt = secrets.token_hex(16)
-    h = hashlib.sha256(f"{salt}{password}".encode()).hexdigest()
-    return h, salt
+    h = hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), PBKDF2_ITERS).hex()
+    return 'pbkdf2:' + h, salt
+
+def _sha256_pw(password: str, salt: str) -> str:
+    return hashlib.sha256(f"{salt}{password}".encode()).hexdigest()
 
 def verify_pw(password: str, hashed: str, salt: str) -> bool:
-    return hash_pw(password, salt)[0] == hashed
+    if hashed.startswith('pbkdf2:'):
+        expected = 'pbkdf2:' + hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), PBKDF2_ITERS).hex()
+        return hmac.compare_digest(expected, hashed)
+    return hmac.compare_digest(_sha256_pw(password, salt), hashed)
 
 def init_default_user():
     conn = get_db()
@@ -463,7 +488,9 @@ def _valid_email(e: str) -> bool:
     return bool(re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', e))
 
 @app.post("/api/auth/login")
-def login(data: LoginIn):
+def login(data: LoginIn, request: Request):
+    if not _check_auth_rate(request):
+        raise HTTPException(429, detail="試行回数が多すぎます。15分後に再試行してください。")
     conn = get_db()
     identifier = data.username.strip()
     # メールアドレスで検索（優先）→ 旧ユーザー名でフォールバック
@@ -473,13 +500,21 @@ def login(data: LoginIn):
     conn.close()
     if not row or not verify_pw(data.password, row[1], row[2]):
         raise HTTPException(401, detail="メールアドレスまたはパスワードが違います")
+    if not row[1].startswith('pbkdf2:'):
+        new_h, new_s = hash_pw(data.password)
+        conn2 = get_db()
+        conn2.execute("UPDATE users SET pw_hash=?,pw_salt=? WHERE id=?", (new_h, new_s, row[0]))
+        conn2.commit()
+        conn2.close()
     token = secrets.token_hex(32)
     active_sessions[token] = row[0]
     session_created[token] = __import__("time").time()
     return {"token": token, "display_name": row[3], "username": row[4]}
 
 @app.post("/api/auth/register")
-def register(data: RegisterIn):
+def register(data: RegisterIn, request: Request):
+    if not _check_auth_rate(request):
+        raise HTTPException(429, detail="試行回数が多すぎます。15分後に再試行してください。")
     email = data.email.strip().lower()
     if not _valid_email(email):
         raise HTTPException(400, detail="有効なメールアドレスを入力してください")
@@ -529,9 +564,13 @@ def sso_login(token: str):
         if payload.get('exp', 0) < time.time() * 1000:
             raise HTTPException(400, detail="token expired")
         # sigを一意キーとしてリプレイ攻撃を防止（NiceMeetトークンにjtiなし）
+        import time as _t2
+        _now2 = _t2.time()
+        for _s in [_s for _s, _ts in list(used_sso_tokens.items()) if _now2 - _ts > 300]:
+            del used_sso_tokens[_s]
         if sig in used_sso_tokens:
             raise HTTPException(400, detail="invalid token")
-        used_sso_tokens.add(sig)
+        used_sso_tokens[sig] = _now2
         name = payload.get('name', '').strip()
         email = payload.get('email', '').strip()
         if not name:
@@ -904,7 +943,10 @@ def google_calendar_connect(request: Request, token: str = ''):
     if not client_id:
         raise HTTPException(500, detail="Google認証が未設定です")
     state = secrets.token_hex(16)
-    oauth_states[state] = uid
+    import time as _t4
+    _cutoff4 = _t4.time() - 600
+    for _k4 in [_k4 for _k4, _v4 in list(oauth_states.items()) if isinstance(_v4, tuple) and _v4[1] < _cutoff4]: del oauth_states[_k4]
+    oauth_states[state] = (uid, _t4.time())
     params = {
         'client_id': client_id,
         'redirect_uri': GOOGLE_REDIRECT_URI,
@@ -922,7 +964,8 @@ async def google_calendar_callback(code: str = None, state: str = None, error: s
     base_url = "https://gaiaarts.org/bni/"
     if error or not code or not state:
         return RedirectResponse(base_url + "?google_error=1")
-    uid = oauth_states.pop(state, None)
+    _state_val = oauth_states.pop(state, None)
+    uid = _state_val[0] if isinstance(_state_val, tuple) else _state_val
     if not uid:
         return RedirectResponse(base_url + "?google_error=1")
     load_google_credentials()
@@ -1760,7 +1803,7 @@ data/one_on_ones.json 1-2-1記録一覧（再インポート用）
     return StreamingResponse(
         buf,
         media_type='application/zip',
-        headers={{'Content-Disposition': f'attachment; filename="1to1manager-{today}.zip"'}}
+        headers={'Content-Disposition': f'attachment; filename="1to1manager-{today}.zip"'}
     )
 
 @app.get("/api/contacts/{cid}/one-on-ones")
@@ -1796,8 +1839,9 @@ def get_all_one_on_ones(request: Request):
 @app.post("/api/upgrade-request")
 def upgrade_request(request: Request):
     uid = get_uid(request)
-    with get_db() as conn:
-        user = conn.execute("SELECT display_name, email FROM users WHERE id=?", (uid,)).fetchone()
+    conn = get_db()
+    user = conn.execute("SELECT display_name, email FROM users WHERE id=?", (uid,)).fetchone()
+    conn.close()
     if not user:
         raise HTTPException(404)
     import smtplib, os as _os
