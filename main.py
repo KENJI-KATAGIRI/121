@@ -35,6 +35,8 @@ if _env_file.exists():
         if _line and not _line.startswith('#') and '=' in _line:
             _k, _v = _line.split('=', 1)
             os.environ.setdefault(_k.strip(), _v.strip())
+# .env読み込み後にstripeキーを再設定
+stripe.api_key = os.environ.get("STRIPE_SECRET_KEY", "")
 
 app = FastAPI(title="BNI Manager")
 BASE_DIR = Path(__file__).parent
