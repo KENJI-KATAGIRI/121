@@ -6,7 +6,7 @@ import urllib.parse
 from pydantic import BaseModel
 from typing import Optional
 import sqlite3
-from datetime import datetime, timedelta
+from datetime import timedelta
 from pathlib import Path
 import os
 import json
@@ -526,7 +526,7 @@ def register(data: RegisterIn, request: Request):
     conn = get_db()
     try:
         # usernameもemailと同じ値にしてSSO統合しやすくする
-        trial_expires = (datetime.utcnow() + timedelta(days=30)).strftime('%Y-%m-%d %H:%M:%S')
+        trial_expires = (datetime.datetime.utcnow() + timedelta(days=30)).strftime('%Y-%m-%d %H:%M:%S')
         conn.execute("INSERT INTO users (username,display_name,email,pw_hash,pw_salt,auth_type,plan,plan_expires) VALUES (?,?,?,?,?,'password','trial',?)",
                      (email, data.display_name.strip(), email, h, s, trial_expires))
         conn.commit()
@@ -632,8 +632,8 @@ def get_me(request: Request):
     trial_days_left = None
     is_trial_active = False
     if plan == 'trial' and row[6]:
-        exp = datetime.fromisoformat(row[6])
-        days = math.ceil((exp - datetime.utcnow()).total_seconds() / 86400)
+        exp = datetime.datetime.fromisoformat(row[6])
+        days = math.ceil((exp - datetime.datetime.utcnow()).total_seconds() / 86400)
         trial_days_left = max(0, days)
         is_trial_active = days > 0
     return {
