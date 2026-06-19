@@ -1282,13 +1282,12 @@ async function deleteReferral(rid, cid) {
 
 function start121(cid, cname) {
   const user = localStorage.getItem('bni_username') || 'admin';
-  const room = '121-' + user + '-' + cid + '-' + Date.now();
+  const room = 'b' + Date.now().toString(36);
   const url = new URL('https://meet.gaiaarts.org/');
   url.searchParams.set('system', 'bni');
-  url.searchParams.set('bni_user', user);
-  url.searchParams.set('bni_contact_id', cid);
-  url.searchParams.set('bni_contact_name', cname);
-  url.searchParams.set('name', cname);
+  url.searchParams.set('bu', user);
+  url.searchParams.set('bi', cid);
+  url.searchParams.set('bn', cname);
   url.searchParams.set('room', room);
   window.open(url.toString(), '_blank');
 }

@@ -180,7 +180,7 @@ AUTH_RATE_MAX = 20
 
 def _check_auth_rate(request: Request) -> bool:
     import time as _t
-    ip = (request.headers.get('x-forwarded-for', '') or (request.client.host if request.client else 'unknown')).split(',')[0].strip()
+    ip = request.headers.get('x-real-ip', '').strip() or (request.headers.get('x-forwarded-for', '') or (request.client.host if request.client else 'unknown')).split(',')[-1].strip()
     now = _t.time()
     attempts = [ts for ts in _auth_attempts.get(ip, []) if now - ts < AUTH_RATE_WINDOW]
     attempts.append(now)
@@ -236,7 +236,7 @@ def get_uid(request: Request) -> int:
 class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
-        open_paths = ('/api/auth/', '/profile/')
+        open_paths = ('/api/auth/', '/profile/', '/api/nicemeet-webhook', '/api/nicemeet-contact', '/api/stripe/webhook')
         if path.startswith('/api/') and not any(path.startswith(p) for p in open_paths):
             import time as _time
             _tok = request.headers.get('authorization','')
@@ -783,24 +783,26 @@ async def update_my_profile(request: Request):
     return data
 
 @app.get("/api/public-profile")
-def public_profile_data():
-    data = get_setting('my_profile_data')
-    if not data:
+def public_profile_data(request: Request):
+    uid = get_uid(request)
+    conn = get_db()
+    row = conn.execute("SELECT profile_data FROM users WHERE id=?", (uid,)).fetchone()
+    conn.close()
+    if not row:
         raise HTTPException(404)
-    p = json.loads(data)
+    p = json.loads(row[0] or '{}')
     if not p.get('public', False):
         raise HTTPException(404, detail="プロフィールは非公開です")
     return p
 
 @app.get("/profile/{slug}")
 def public_profile_page(slug: str):
-    stored_slug = get_setting('profile_slug') or 'my-profile'
-    if slug != stored_slug:
+    conn = get_db()
+    row = conn.execute("SELECT profile_data, display_name FROM users WHERE username=?", (slug,)).fetchone()
+    conn.close()
+    if not row:
         raise HTTPException(404)
-    data = get_setting('my_profile_data')
-    if not data:
-        raise HTTPException(404)
-    p = json.loads(data)
+    p = json.loads(row[0] or '{}')
     if not p.get('public', False):
         return HTMLResponse("<h2>このプロフィールは非公開です</h2>", status_code=403)
     name = _html.escape(p.get('name',''))
@@ -1519,7 +1521,7 @@ async def import_url(request: Request, url: str = Form(...)):
 async def nicemeet_contact(request: Request):
     secret = request.headers.get("x-nicemeet-secret", "")
     expected = os.environ.get("NICEMEET_WEBHOOK_SECRET") or ""
-    if secret != expected:
+    if not expected or secret != expected:
         raise HTTPException(403, detail="forbidden")
     data = await request.json()
     bni_user = data.get("bni_user", "")
@@ -1565,7 +1567,7 @@ async def nicemeet_contact(request: Request):
 async def nicemeet_webhook(request: Request):
     secret = request.headers.get("x-nicemeet-secret", "")
     expected = os.environ.get("NICEMEET_WEBHOOK_SECRET") or ""
-    if secret != expected:
+    if not expected or secret != expected:
         raise HTTPException(403, detail="forbidden")
     data = await request.json()
     conn = get_db()
@@ -1608,7 +1610,8 @@ async def nicemeet_webhook(request: Request):
     try:
         import datetime, urllib.request, json as _json
         drive_url = os.environ.get("DRIVE_INTERNAL_URL", "http://localhost:8309/api/internal/upload-json")
-        drive_secret = os.environ.get("DRIVE_INTERNAL_SECRET", "gaia-internal-2026")
+        drive_secret = os.environ.get("DRIVE_INTERNAL_SECRET", "")
+        if not drive_secret: return {"ok": True}  # R2 secret not configured
         today = datetime.date.today().isoformat()
         safe_name = (data.get("contact_name","unknown") or "unknown").replace(" ", "_")
         r2_key = f"1to1manager/one_on_ones/{today}/{data.get('bni_user','unknown')}-{safe_name}.json"
@@ -1639,8 +1642,8 @@ async def nicemeet_webhook(request: Request):
 # ── データエクスポート ────────────────────────────────────────
 
 def build_viewer_html(contacts, one_on_ones):
-    contacts_json = json.dumps(contacts, ensure_ascii=False)
-    oo_json = json.dumps(one_on_ones, ensure_ascii=False)
+    contacts_json = json.dumps(contacts, ensure_ascii=False).replace("</", "<\/")
+    oo_json = json.dumps(one_on_ones, ensure_ascii=False).replace("</", "<\/")
     today = datetime.date.today().isoformat()
     return f"""<!DOCTYPE html>
 <html lang="ja">
