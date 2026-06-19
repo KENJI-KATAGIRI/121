@@ -25,6 +25,7 @@ import datetime
 import zipfile
 import io
 import stripe
+import math
 
 stripe.api_key = os.environ.get("STRIPE_SECRET_KEY", "")
 
@@ -631,7 +632,6 @@ def get_me(request: Request):
     trial_days_left = None
     is_trial_active = False
     if plan == 'trial' and row[6]:
-        import math
         exp = datetime.fromisoformat(row[6])
         days = math.ceil((exp - datetime.utcnow()).total_seconds() / 86400)
         trial_days_left = max(0, days)
