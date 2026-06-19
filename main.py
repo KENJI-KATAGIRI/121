@@ -6,6 +6,7 @@ import urllib.parse
 from pydantic import BaseModel
 from typing import Optional
 import sqlite3
+from datetime import datetime, timedelta
 from pathlib import Path
 import os
 import json
@@ -524,8 +525,9 @@ def register(data: RegisterIn, request: Request):
     conn = get_db()
     try:
         # usernameもemailと同じ値にしてSSO統合しやすくする
-        conn.execute("INSERT INTO users (username,display_name,email,pw_hash,pw_salt,auth_type) VALUES (?,?,?,?,?,'password')",
-                     (email, data.display_name.strip(), email, h, s))
+        trial_expires = (datetime.utcnow() + timedelta(days=30)).strftime('%Y-%m-%d %H:%M:%S')
+        conn.execute("INSERT INTO users (username,display_name,email,pw_hash,pw_salt,auth_type,plan,plan_expires) VALUES (?,?,?,?,?,'password','trial',?)",
+                     (email, data.display_name.strip(), email, h, s, trial_expires))
         conn.commit()
     except sqlite3.IntegrityError:
         raise HTTPException(400, detail="そのメールアドレスは既に登録されています")
@@ -620,15 +622,26 @@ def get_me(request: Request):
     uid = get_uid(request)
     conn = get_db()
     row = conn.execute(
-        "SELECT username, display_name, email, auth_type, plan, stripe_customer_id FROM users WHERE id=?", (uid,)
+        "SELECT username, display_name, email, auth_type, plan, stripe_customer_id, plan_expires FROM users WHERE id=?", (uid,)
     ).fetchone()
     conn.close()
     if not row:
         raise HTTPException(401, detail="unauthorized")
+    plan = row[4] or 'free'
+    trial_days_left = None
+    is_trial_active = False
+    if plan == 'trial' and row[6]:
+        import math
+        exp = datetime.fromisoformat(row[6])
+        days = math.ceil((exp - datetime.utcnow()).total_seconds() / 86400)
+        trial_days_left = max(0, days)
+        is_trial_active = days > 0
     return {
         "username": row[0], "display_name": row[1], "email": row[2] or '',
-        "auth_type": row[3] or 'password', "plan": row[4] or 'free',
-        "has_stripe": bool(row[5])
+        "auth_type": row[3] or 'password', "plan": plan,
+        "has_stripe": bool(row[5]),
+        "trial_days_left": trial_days_left,
+        "is_trial_active": is_trial_active
     }
 
 @app.post("/api/stripe/checkout")
@@ -652,8 +665,6 @@ async def stripe_checkout(request: Request):
             payment_method_types=["card"],
             line_items=[{"price": os.environ.get("STRIPE_PRICE_ID",""), "quantity": 1}],
             mode="subscription",
-            subscription_data={"trial_period_days": 30},
-            payment_method_collection="always",
             success_url="https://gaiaarts.org/bni/?plan=success",
             cancel_url="https://gaiaarts.org/bni/",
             locale="ja",

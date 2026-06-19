@@ -342,10 +342,10 @@
       <h3 class="font-bold text-gray-700">💳 プラン・お支払い</h3>
       <div id="plan-status-display" class="text-sm text-gray-400">確認中...</div>
       <div id="plan-free-actions" class="hidden space-y-2">
-        <p class="text-xs text-gray-500">1to1マネージャー単独プラン ¥500/月（30日間無料トライアル付き）</p>
+        <p class="text-xs text-gray-500">トライアル終了後は¥500/月でご利用いただけます。</p>
         <button onclick="startStripeCheckout()" id="btn-start-trial"
           class="w-full bg-indigo-600 text-white font-semibold py-2.5 rounded-lg hover:bg-indigo-700 transition">
-          🚀 30日間無料トライアルを開始
+          🚀 有料プランに移行する（¥500/月）
         </button>
       </div>
       <div id="plan-paid-actions" class="hidden">
@@ -740,17 +740,22 @@ async function loadSettingsAuthType() {
       noteEl.classList.toggle('hidden', isGmail || currentEmail === '未設定');
     }
     const isPaid = me.plan === 'paid';
-    const hasStripe = me.has_stripe;
+    const isTrial = me.plan === 'trial';
+    const isTrialActive = me.is_trial_active;
+    const trialDaysLeft = me.trial_days_left;
     const statusEl = document.getElementById('plan-status-display');
-    if (isPaid && hasStripe) {
+    if (isPaid) {
       statusEl.innerHTML = '<span class="inline-block bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded-full">✅ スタンダード ¥500/月</span>';
-    } else if (hasStripe) {
-      statusEl.innerHTML = '<span class="inline-block bg-indigo-100 text-indigo-700 text-xs font-bold px-2 py-1 rounded-full">🎁 30日間無料トライアル中</span>';
+    } else if (isTrial && isTrialActive) {
+      const cls = trialDaysLeft <= 3 ? 'bg-red-100 text-red-700' : trialDaysLeft <= 7 ? 'bg-yellow-100 text-yellow-700' : 'bg-indigo-100 text-indigo-700';
+      statusEl.innerHTML = `<span class="inline-block ${cls} text-xs font-bold px-2 py-1 rounded-full">🎁 無料トライアル中（残り${trialDaysLeft}日）</span>`;
     } else {
-      statusEl.innerHTML = '<span class="inline-block bg-gray-100 text-gray-600 text-xs font-bold px-2 py-1 rounded-full">無料プラン</span>';
+      statusEl.innerHTML = '<span class="inline-block bg-gray-100 text-gray-600 text-xs font-bold px-2 py-1 rounded-full">無料プラン（トライアル終了）</span>';
     }
-    document.getElementById('plan-free-actions').classList.toggle('hidden', hasStripe);
-    document.getElementById('plan-paid-actions').classList.toggle('hidden', !hasStripe);
+    const showUpgrade = !isPaid && (!isTrialActive);
+    const showTrialWarning = isTrial && isTrialActive && trialDaysLeft <= 7;
+    document.getElementById('plan-free-actions').classList.toggle('hidden', !showUpgrade && !showTrialWarning);
+    document.getElementById('plan-paid-actions').classList.toggle('hidden', !isPaid);
   } catch(e) {}
 }
 
