@@ -476,8 +476,14 @@ class LoginIn(BaseModel):
 
 class RegisterIn(BaseModel):
     email: str
-    display_name: str
+    display_name: str = ''
     password: str
+
+    def validate_fields(self):
+        if len(self.display_name) > 100:
+            raise ValueError('display_nameは100文字以内にしてください')
+        if len(self.password) > 256:
+            raise ValueError('passwordは256文字以内にしてください')
 
 class ChangePwIn(BaseModel):
     current_password: str
@@ -522,6 +528,10 @@ def register(data: RegisterIn, request: Request):
         raise HTTPException(400, detail="有効なメールアドレスを入力してください")
     if len(data.password) < 6:
         raise HTTPException(400, detail="パスワードは6文字以上にしてください")
+    if len(data.password) > 256:
+        raise HTTPException(400, detail="パスワードは256文字以内にしてください")
+    if len(data.display_name) > 100:
+        raise HTTPException(400, detail="表示名は100文字以内にしてください")
     h, s = hash_pw(data.password)
     conn = get_db()
     try:
@@ -784,8 +794,13 @@ def get_my_profile(request: Request):
 @app.put("/api/my-profile")
 async def update_my_profile(request: Request):
     uid = get_uid(request)
-    data = await request.json()
-    display_name = data.get('display_name', '')
+    if not uid:
+        raise HTTPException(401)
+    raw = await request.body()
+    if len(raw) > 20000:
+        raise HTTPException(400, detail="プロフィールデータが大きすぎます（20KB以内）")
+    data = json.loads(raw)
+    display_name = str(data.get('display_name', ''))[:100]
     profile_json = json.dumps(data, ensure_ascii=False)
     conn = get_db()
     conn.execute("UPDATE users SET profile_data=?, display_name=? WHERE id=?", (profile_json, display_name, uid))
