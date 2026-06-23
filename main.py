@@ -152,6 +152,13 @@ def init_db():
         );
     """)
     # 既存テーブルへのカラム追加（マイグレーション）
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS sessions (
+            token TEXT PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            created_at REAL NOT NULL
+        )
+    """)
     for sql in [
         "ALTER TABLE contacts ADD COLUMN user_id INTEGER DEFAULT 1",
         "ALTER TABLE one_on_ones ADD COLUMN follow_up TEXT DEFAULT ''",
@@ -174,6 +181,47 @@ active_sessions: dict = {}  # token -> user_id
 oauth_states: dict = {}     # state -> (user_id, created_at) Google OAuth用
 session_created: dict = {}  # token -> created_at
 SESSION_TTL = 86400 * 30   # 30日
+
+def _save_session(token: str, user_id: int, created_at: float):
+    try:
+        conn = get_db()
+        conn.execute("INSERT OR REPLACE INTO sessions (token, user_id, created_at) VALUES (?,?,?)",
+                     (token, user_id, created_at))
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+def _delete_session(token: str):
+    try:
+        conn = get_db()
+        conn.execute("DELETE FROM sessions WHERE token=?", (token,))
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+def _load_sessions():
+    import time as _t
+    try:
+        conn = get_db()
+        rows = conn.execute(
+            "SELECT token, user_id, created_at FROM sessions WHERE created_at > ?",
+            (_t.time() - SESSION_TTL,)
+        ).fetchall()
+        conn.close()
+        for row in rows:
+            active_sessions[row[0]] = row[1]
+            session_created[row[0]] = row[2]
+        # 期限切れをDBからも削除
+        conn2 = get_db()
+        conn2.execute("DELETE FROM sessions WHERE created_at <= ?", (_t.time() - SESSION_TTL,))
+        conn2.commit()
+        conn2.close()
+    except Exception:
+        pass
+
+_load_sessions()
 used_sso_tokens: dict = {}  # sig -> created_at (JTIリプレイ攻撃防止)
 
 _auth_attempts: dict = {}  # ip -> [timestamp, ...]
@@ -515,8 +563,10 @@ def login(data: LoginIn, request: Request):
         conn2.commit()
         conn2.close()
     token = secrets.token_hex(32)
+    _ts = __import__("time").time()
     active_sessions[token] = row[0]
-    session_created[token] = __import__("time").time()
+    session_created[token] = _ts
+    _save_session(token, row[0], _ts)
     return {"token": token, "display_name": row[3], "username": row[4]}
 
 @app.post("/api/auth/register")
@@ -613,8 +663,10 @@ def sso_login(token: str):
         conn.close()
         import time as _time
         session_token = secrets.token_hex(32)
+        _ts2 = _time.time()
         active_sessions[session_token] = user_id
-        session_created[session_token] = _time.time()
+        session_created[session_token] = _ts2
+        _save_session(session_token, user_id, _ts2)
         return {"token": session_token, "display_name": display_name, "username": username}
     except HTTPException:
         raise
@@ -626,6 +678,7 @@ def logout(request: Request):
     token = request.headers.get('authorization', '')
     active_sessions.pop(token, None)
     session_created.pop(token, None)
+    _delete_session(token)
     return {"ok": True}
 
 @app.get("/api/me")
