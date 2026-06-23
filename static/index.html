@@ -612,7 +612,7 @@ async function doLogin() {
   errEl.classList.add('hidden');
   try {
     const r = await fetch(BASE + 'api/auth/login', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
+      method: 'POST', headers: {'Content-Type':'application/json', 'Authorization': authToken},
       body: JSON.stringify({username, password: pw})
     });
     if (!r.ok) {
@@ -651,7 +651,7 @@ async function doRegister() {
   if (!email || !display_name || !password) { errEl.textContent = 'すべての項目を入力してください'; errEl.classList.remove('hidden'); return; }
   try {
     const r = await fetch(BASE + 'api/auth/register', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
+      method: 'POST', headers: {'Content-Type':'application/json', 'Authorization': authToken},
       body: JSON.stringify({email, display_name, password})
     });
     if (!r.ok) {
@@ -661,7 +661,7 @@ async function doRegister() {
     }
     // 登録後に自動ログイン
     const lr = await fetch(BASE + 'api/auth/login', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
+      method: 'POST', headers: {'Content-Type':'application/json', 'Authorization': authToken},
       body: JSON.stringify({username: email, password})
     });
     if (!lr.ok) {
@@ -1497,8 +1497,8 @@ async function extractFromUrl() {
   if (!url) { msg.style.color='#ef4444'; msg.textContent='URLを入力してください'; return; }
   btn.disabled = true; btn.textContent = '取得中…'; msg.style.color='#6b7280'; msg.textContent='ページを読み込んでいます…';
   try {
-    const res = await fetch('/api/extract-contact-url', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
+    const res = await fetch(BASE + 'api/extract-contact-url', {
+      method: 'POST', headers: {'Content-Type':'application/json', 'Authorization': authToken},
       body: JSON.stringify({ url })
     });
     const data = await res.json();
