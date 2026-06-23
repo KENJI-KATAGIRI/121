@@ -688,11 +688,10 @@ async def stripe_webhook(request: Request):
     payload = await request.body()
     sig = request.headers.get("stripe-signature", "")
     webhook_secret = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
+    if not webhook_secret:
+        raise HTTPException(500, detail="Stripe webhook not configured")
     try:
-        if webhook_secret:
-            event = stripe.Webhook.construct_event(payload, sig, webhook_secret)
-        else:
-            event = json.loads(payload)
+        event = stripe.Webhook.construct_event(payload, sig, webhook_secret)
     except Exception as e:
         raise HTTPException(400, detail=str(e))
     etype = event.get("type", "")
@@ -1042,8 +1041,8 @@ async def sync_reminder_google(request: Request, rid: int):
     uid = get_uid(request)
     conn = get_db()
     row = conn.execute(
-        "SELECT r.*, c.name as contact_name FROM reminders r JOIN contacts c ON c.id=r.contact_id WHERE r.id=?",
-        (rid,)
+        "SELECT r.*, c.name as contact_name FROM reminders r JOIN contacts c ON c.id=r.contact_id WHERE r.id=? AND c.user_id=?",
+        (rid, uid)
     ).fetchone()
     conn.close()
     if not row:
@@ -1679,6 +1678,22 @@ async def extract_contact_url(request: Request):
     url = data.get("url", "").strip()
     if not url or not url.startswith(("http://", "https://")):
         raise HTTPException(400, detail="有効なURLを入力してください")
+    # SSRF対策: プライベートIPへのアクセスをブロック
+    import ipaddress as _ip, socket as _sock
+    from urllib.parse import urlparse as _urlparse
+    _SSRF_BLOCK = [_ip.ip_network(n) for n in [
+        "127.0.0.0/8","10.0.0.0/8","172.16.0.0/12",
+        "192.168.0.0/16","169.254.0.0/16","::1/128","fc00::/7"
+    ]]
+    try:
+        _host = _urlparse(url).hostname or ""
+        _addr = _ip.ip_address(_sock.gethostbyname(_host))
+        if any(_addr in net for net in _SSRF_BLOCK):
+            raise HTTPException(400, detail="内部ネットワークへのアクセスは許可されていません")
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(400, detail="URLの解決に失敗しました")
     try:
         async with httpx.AsyncClient(
             follow_redirects=True, timeout=15,
@@ -1732,7 +1747,7 @@ async def extract_contact_url(request: Request):
 async def nicemeet_contact(request: Request):
     secret = request.headers.get("x-nicemeet-secret", "")
     expected = os.environ.get("NICEMEET_WEBHOOK_SECRET") or ""
-    if not expected or secret != expected:
+    if not expected or not hmac.compare_digest(secret, expected):
         raise HTTPException(403, detail="forbidden")
     data = await request.json()
     bni_user = data.get("bni_user", "")
@@ -1778,7 +1793,7 @@ async def nicemeet_contact(request: Request):
 async def nicemeet_webhook(request: Request):
     secret = request.headers.get("x-nicemeet-secret", "")
     expected = os.environ.get("NICEMEET_WEBHOOK_SECRET") or ""
-    if not expected or secret != expected:
+    if not expected or not hmac.compare_digest(secret, expected):
         raise HTTPException(403, detail="forbidden")
     data = await request.json()
     conn = get_db()
