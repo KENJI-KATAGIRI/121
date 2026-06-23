@@ -1253,6 +1253,135 @@ def suggest_next_meetings(request: Request):
 
 
 # ── AIマッチング ──────────────────────────────────────────
+
+@app.post("/api/contacts/{cid}/recommend-categories")
+def recommend_categories(request: Request, cid: int):
+    uid = get_uid(request)
+    conn = get_db()
+    target = conn.execute("SELECT * FROM contacts WHERE id=? AND user_id=?", (cid, uid)).fetchone()
+    conn.close()
+    if not target:
+        raise HTTPException(404)
+    t = dict(target)
+    profile = f"""名前: {t.get('name','')}
+職種: {t.get('category','')}
+事業内容: {t.get('business_description','')}
+独自の強み: {t.get('selling_points','')}
+ターゲット顧客: {t.get('target_customers','')}
+Goals: {t.get('goals','')}
+Accomplishments: {t.get('accomplishments','')}
+Interests: {t.get('interests','')}
+Networks: {t.get('networks','')}
+Skills: {t.get('skills','')}
+紹介文: {t.get('introduction','')}"""
+
+    prompt = f"""あなたはBNIのビジネスマッチング専門AIです。
+以下のBNIメンバーのプロフィールを分析し、この人が紹介を受けると特に喜ぶ・ビジネスに役立つ職種・カテゴリを提案してください。
+
+【分析対象】
+{profile}
+
+以下のJSON形式で、おすすめカテゴリを5〜7件返してください：
+{{
+  "categories": [
+    {{
+      "category": "職種・カテゴリ名",
+      "reason": "なぜこのカテゴリが合うか（50字程度）",
+      "scenario": "具体的な紹介シナリオ（60字程度）",
+      "priority": "high/medium/low"
+    }}
+  ]
+}}
+
+priorityの基準:
+- high: 今すぐ繋がると大きな効果が期待できる
+- medium: 中期的にビジネス発展に役立つ
+- low: あると便利・相乗効果がある
+
+JSONのみ返してください。"""
+
+    load_openai()
+    try:
+        from openai import OpenAI
+        client = OpenAI()
+        res = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=1500,
+            response_format={"type": "json_object"}
+        )
+        data = json.loads(res.choices[0].message.content)
+        return {"categories": data.get("categories", [])}
+    except Exception as e:
+        raise HTTPException(500, detail=str(e))
+
+
+@app.post("/api/contacts/{cid}/check-category")
+async def check_category(request: Request, cid: int):
+    uid = get_uid(request)
+    conn = get_db()
+    target = conn.execute("SELECT * FROM contacts WHERE id=? AND user_id=?", (cid, uid)).fetchone()
+    conn.close()
+    if not target:
+        raise HTTPException(404)
+    body = await request.json()
+    category = body.get("category", "").strip()
+    if not category:
+        raise HTTPException(400, detail="カテゴリを入力してください")
+    t = dict(target)
+    profile = f"""名前: {t.get('name','')}
+職種: {t.get('category','')}
+事業内容: {t.get('business_description','')}
+独自の強み: {t.get('selling_points','')}
+ターゲット顧客: {t.get('target_customers','')}
+Goals: {t.get('goals','')}
+Accomplishments: {t.get('accomplishments','')}
+Interests: {t.get('interests','')}
+Networks: {t.get('networks','')}
+Skills: {t.get('skills','')}
+紹介文: {t.get('introduction','')}"""
+
+    prompt = f"""あなたはBNIのビジネスマッチング専門AIです。
+以下のBNIメンバーに「{category}」の人を紹介することが適切かどうかを分析してください。
+
+【分析対象メンバー】
+{profile}
+
+【チェックするカテゴリ】
+{category}
+
+以下のJSON形式で返してください：
+{{
+  "score": <0〜100の相性スコア>,
+  "verdict": "excellent/good/neutral/poor",
+  "summary": "一言で判定（20字程度）",
+  "reasons": ["合う理由1", "合う理由2", "合う理由3"],
+  "concerns": ["懸念点1（あれば）"],
+  "scenario": "具体的な紹介シナリオ（100字程度）"
+}}
+
+verdict基準:
+- excellent(80〜100): ぜひ紹介すべき
+- good(60〜79): 合う可能性が高い
+- neutral(40〜59): 状況次第
+- poor(0〜39): あまり合わない可能性が高い
+
+JSONのみ返してください。"""
+
+    load_openai()
+    try:
+        from openai import OpenAI
+        client = OpenAI()
+        res = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=800,
+            response_format={"type": "json_object"}
+        )
+        data = json.loads(res.choices[0].message.content)
+        return data
+    except Exception as e:
+        raise HTTPException(500, detail=str(e))
 @app.post("/api/contacts/{cid}/match")
 def match_contacts(request: Request, cid: int):
     uid = get_uid(request)

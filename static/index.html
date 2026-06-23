@@ -1345,20 +1345,109 @@ let currentContactName = '';
 
 function renderMatching(c) {
   return `
-    <div>
-      <div class="flex items-start justify-between mb-4">
-        <div>
-          <div class="text-sm font-semibold text-gray-700">AIビジネスマッチング</div>
-          <div class="text-xs text-gray-400 mt-0.5">${esc(c.name)}さんと相性の良いメンバーをAIが分析します</div>
+    <div class="space-y-5">
+
+      <!-- 1: おすすめ紹介カテゴリ -->
+      <div style="border:1px solid #e9d5ff;border-radius:12px;padding:14px">
+        <div class="flex items-center justify-between mb-3">
+          <div>
+            <div class="text-sm font-semibold text-gray-700">💡 おすすめ紹介カテゴリ</div>
+            <div class="text-xs text-gray-400 mt-0.5">この人に紹介すると喜ばれる職種をAIが提案</div>
+          </div>
+          <button onclick="runRecommendCategories(${c.id})" id="recCatBtn" class="text-sm bg-violet-600 text-white px-3 py-1.5 rounded-lg hover:bg-violet-700 whitespace-nowrap">分析する</button>
         </div>
-        <button onclick="runMatching(${c.id})" id="matchBtn" class="text-sm bg-purple-600 text-white px-3 py-1.5 rounded-lg hover:bg-purple-700 whitespace-nowrap">
-          🤝 マッチング分析
-        </button>
+        <div id="recCatResult"><div class="text-xs text-gray-400 text-center py-4">ボタンを押すとAIが分析します</div></div>
       </div>
-      <div id="matchResult">
-        <div class="text-sm text-gray-400 text-center py-8">「マッチング分析」ボタンを押すと、AIが相性の良いメンバーを分析します</div>
+
+      <!-- 2: カテゴリ相性チェック -->
+      <div style="border:1px solid #bfdbfe;border-radius:12px;padding:14px">
+        <div class="mb-3">
+          <div class="text-sm font-semibold text-gray-700">🔍 カテゴリ相性チェック</div>
+          <div class="text-xs text-gray-400 mt-0.5">職種・カテゴリを入力して相性をAIに確認</div>
+        </div>
+        <div class="flex gap-2 mb-3">
+          <input id="checkCatInput" type="text" placeholder="例: 税理士、不動産業者、ITコンサル..." class="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+          <button onclick="runCheckCategory(${c.id})" id="checkCatBtn" class="text-sm bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 whitespace-nowrap">チェック</button>
+        </div>
+        <div id="checkCatResult"></div>
       </div>
+
+      <!-- 3: 登録コンタクトとのマッチング -->
+      <div style="border:1px solid #d1d5db;border-radius:12px;padding:14px">
+        <div class="flex items-center justify-between mb-3">
+          <div>
+            <div class="text-sm font-semibold text-gray-700">🤝 登録コンタクトとのマッチング</div>
+            <div class="text-xs text-gray-400 mt-0.5">登録済みメンバーの中から相性の良い人をAIが選出</div>
+          </div>
+          <button onclick="runMatching(${c.id})" id="matchBtn" class="text-sm bg-purple-600 text-white px-3 py-1.5 rounded-lg hover:bg-purple-700 whitespace-nowrap">分析する</button>
+        </div>
+        <div id="matchResult"><div class="text-xs text-gray-400 text-center py-4">ボタンを押すとAIが分析します</div></div>
+      </div>
+
     </div>`;
+}
+
+async function runRecommendCategories(cid) {
+  const btn = document.getElementById('recCatBtn');
+  const el = document.getElementById('recCatResult');
+  btn.disabled = true; btn.textContent = '分析中…';
+  el.innerHTML = '<div class="text-xs text-gray-400 text-center py-4">AIが分析中です...</div>';
+  try {
+    const res = await api('POST', '/contacts/'+cid+'/recommend-categories');
+    if (!res.categories || !res.categories.length) {
+      el.innerHTML = '<div class="text-xs text-gray-400 text-center py-4">結果を取得できませんでした</div>'; return;
+    }
+    const priorityStyle = p => p==='high' ? 'background:#fef3c7;color:#92400e;border:1px solid #fde68a' : p==='medium' ? 'background:#ede9fe;color:#5b21b6;border:1px solid #ddd6fe' : 'background:#f3f4f6;color:#6b7280;border:1px solid #e5e7eb';
+    const priorityLabel = p => p==='high' ? '🔥 優先' : p==='medium' ? '✨ おすすめ' : '💭 参考';
+    el.innerHTML = res.categories.map(cat => `
+      <div style="border:1px solid #e5e7eb;border-radius:10px;padding:12px;margin-bottom:8px;background:#fff">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
+          <span style="font-weight:700;font-size:14px;color:#1f2937">${esc(cat.category)}</span>
+          <span style="font-size:11px;padding:2px 8px;border-radius:20px;${priorityStyle(cat.priority)}">${priorityLabel(cat.priority)}</span>
+        </div>
+        <div style="font-size:13px;color:#374151;margin-bottom:4px">${esc(cat.reason)}</div>
+        <div style="font-size:12px;color:#6366f1;background:#eef2ff;border-radius:6px;padding:6px 10px">💡 ${esc(cat.scenario)}</div>
+      </div>`).join('');
+  } catch(e) {
+    el.innerHTML = `<div style="color:#dc2626;font-size:13px">❌ ${esc(e.message)}</div>`;
+  } finally {
+    btn.disabled = false; btn.textContent = '分析する';
+  }
+}
+
+async function runCheckCategory(cid) {
+  const category = document.getElementById('checkCatInput').value.trim();
+  if (!category) { alert('カテゴリを入力してください'); return; }
+  const btn = document.getElementById('checkCatBtn');
+  const el = document.getElementById('checkCatResult');
+  btn.disabled = true; btn.textContent = '確認中…';
+  el.innerHTML = '<div class="text-xs text-gray-400 text-center py-3">AIが判定中です...</div>';
+  try {
+    const res = await api('POST', '/contacts/'+cid+'/check-category', {category});
+    const verdictColor = {excellent:'#16a34a', good:'#2563eb', neutral:'#d97706', poor:'#dc2626'}[res.verdict] || '#6b7280';
+    const verdictBg = {excellent:'#f0fdf4', good:'#eff6ff', neutral:'#fffbeb', poor:'#fef2f2'}[res.verdict] || '#f9fafb';
+    const verdictBorder = {excellent:'#bbf7d0', good:'#bfdbfe', neutral:'#fde68a', poor:'#fecaca'}[res.verdict] || '#e5e7eb';
+    el.innerHTML = `
+      <div style="border:1px solid ${verdictBorder};background:${verdictBg};border-radius:10px;padding:14px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <div>
+            <span style="font-weight:700;font-size:15px;color:#1f2937">「${esc(category)}」との相性</span>
+            <div style="font-size:13px;color:${verdictColor};font-weight:600;margin-top:2px">${esc(res.summary||'')}</div>
+          </div>
+          <div style="text-align:center">
+            <div style="font-size:28px;font-weight:800;color:${verdictColor}">${res.score}</div>
+            <div style="font-size:11px;color:#9ca3af">/ 100</div>
+          </div>
+        </div>
+        ${res.reasons && res.reasons.length ? `<div style="margin-bottom:8px"><div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:4px">✅ 合う理由</div>${res.reasons.map(r=>`<div style="font-size:13px;color:#374151;padding:2px 0">・${esc(r)}</div>`).join('')}</div>` : ''}
+        ${res.concerns && res.concerns.length && res.concerns[0] ? `<div style="margin-bottom:8px"><div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:4px">⚠️ 懸念点</div>${res.concerns.map(r=>`<div style="font-size:13px;color:#6b7280;padding:2px 0">・${esc(r)}</div>`).join('')}</div>` : ''}
+        ${res.scenario ? `<div style="font-size:12px;color:#6366f1;background:#eef2ff;border-radius:6px;padding:8px 10px;margin-top:4px">💡 ${esc(res.scenario)}</div>` : ''}
+      </div>`;
+  } catch(e) {
+    el.innerHTML = `<div style="color:#dc2626;font-size:13px">❌ ${esc(e.message)}</div>`;
+  } finally {
+    btn.disabled = false; btn.textContent = 'チェック';
+  }
 }
 
 async function runMatching(cid) {
