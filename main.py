@@ -161,6 +161,7 @@ def init_db():
     """)
     for sql in [
         "ALTER TABLE contacts ADD COLUMN user_id INTEGER DEFAULT 1",
+        "ALTER TABLE contacts ADD COLUMN matching_cache TEXT DEFAULT '{}'",
         "ALTER TABLE one_on_ones ADD COLUMN follow_up TEXT DEFAULT ''",
         "ALTER TABLE users ADD COLUMN auth_type TEXT DEFAULT 'password'",
         "ALTER TABLE users ADD COLUMN email TEXT DEFAULT ''",
@@ -416,6 +417,21 @@ def update_contact(request: Request, cid: int, c: ContactIn):
     row = conn.execute("SELECT * FROM contacts WHERE id=?", (cid,)).fetchone()
     conn.close()
     return dict(row)
+
+
+@app.put("/api/contacts/{cid}/matching-cache")
+async def save_matching_cache(request: Request, cid: int):
+    uid = get_uid(request)
+    body = await request.json()
+    cache_json = json.dumps(body, ensure_ascii=False)
+    conn = get_db()
+    conn.execute(
+        "UPDATE contacts SET matching_cache=? WHERE id=? AND user_id=?",
+        (cache_json, cid, uid)
+    )
+    conn.commit()
+    conn.close()
+    return {"ok": True}
 
 
 @app.delete("/api/contacts/{cid}")

@@ -1371,9 +1371,17 @@ function renderOneOnOnes(records, cid) {
 let currentContactName = '';
 
 function renderMatching(c) {
+  _mCid = c.id;
+  try { _mCache = JSON.parse(c.matching_cache || '{}'); } catch { _mCache = {}; }
+  const recSaved = _mCache.recommend ? _renderRecHtml(_mCache.recommend) : '<div class="text-xs text-gray-400 text-center py-4">ボタンを押すとAIが分析します</div>';
+  const matchSaved = _mCache.matching ? _renderMatchHtml(_mCache.matching) : '<div class="text-xs text-gray-400 text-center py-4">ボタンを押すとAIが分析します</div>';
+  const checkHistory = (_mCache.checks||[]).length ? `
+    <div style="margin-top:12px;border-top:1px solid #e5e7eb;padding-top:10px">
+      <div style="font-size:12px;font-weight:600;color:#6b7280;margin-bottom:8px">📋 過去のチェック履歴</div>
+      ${[..._mCache.checks].reverse().map(ck=>_renderCheckHtml(ck)).join('')}
+    </div>` : '';
   return `
     <div class="space-y-5">
-
       <!-- 1: おすすめ紹介カテゴリ -->
       <div style="border:1px solid #e9d5ff;border-radius:12px;padding:14px">
         <div class="flex items-center justify-between mb-3">
@@ -1381,11 +1389,10 @@ function renderMatching(c) {
             <div class="text-sm font-semibold text-gray-700">💡 おすすめ紹介カテゴリ</div>
             <div class="text-xs text-gray-400 mt-0.5">この人に紹介すると喜ばれる職種をAIが提案</div>
           </div>
-          <button onclick="runRecommendCategories(${c.id})" id="recCatBtn" class="text-sm bg-violet-600 text-white px-3 py-1.5 rounded-lg hover:bg-violet-700 whitespace-nowrap">分析する</button>
+          <button onclick="runRecommendCategories(${c.id})" id="recCatBtn" class="text-sm bg-violet-600 text-white px-3 py-1.5 rounded-lg hover:bg-violet-700 whitespace-nowrap">再分析</button>
         </div>
-        <div id="recCatResult"><div class="text-xs text-gray-400 text-center py-4">ボタンを押すとAIが分析します</div></div>
+        <div id="recCatResult">${recSaved}</div>
       </div>
-
       <!-- 2: カテゴリ相性チェック -->
       <div style="border:1px solid #bfdbfe;border-radius:12px;padding:14px">
         <div class="mb-3">
@@ -1397,8 +1404,8 @@ function renderMatching(c) {
           <button onclick="runCheckCategory(${c.id})" id="checkCatBtn" class="text-sm bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 whitespace-nowrap">チェック</button>
         </div>
         <div id="checkCatResult"></div>
+        <div id="checkCatHistory">${checkHistory}</div>
       </div>
-
       <!-- 3: 登録コンタクトとのマッチング -->
       <div style="border:1px solid #d1d5db;border-radius:12px;padding:14px">
         <div class="flex items-center justify-between mb-3">
@@ -1406,12 +1413,69 @@ function renderMatching(c) {
             <div class="text-sm font-semibold text-gray-700">🤝 登録コンタクトとのマッチング</div>
             <div class="text-xs text-gray-400 mt-0.5">登録済みメンバーの中から相性の良い人をAIが選出</div>
           </div>
-          <button onclick="runMatching(${c.id})" id="matchBtn" class="text-sm bg-purple-600 text-white px-3 py-1.5 rounded-lg hover:bg-purple-700 whitespace-nowrap">分析する</button>
+          <button onclick="runMatching(${c.id})" id="matchBtn" class="text-sm bg-purple-600 text-white px-3 py-1.5 rounded-lg hover:bg-purple-700 whitespace-nowrap">再分析</button>
         </div>
-        <div id="matchResult"><div class="text-xs text-gray-400 text-center py-4">ボタンを押すとAIが分析します</div></div>
+        <div id="matchResult">${matchSaved}</div>
       </div>
-
     </div>`;
+}
+
+// ── AIマッチングキャッシュ管理 ──────────────────────────────────────
+let _mCache = {}, _mCid = null;
+async function _saveMCache() {
+  if (!_mCid) return;
+  try { await api('PUT', '/contacts/'+_mCid+'/matching-cache', _mCache); } catch(e) {}
+}
+function _nowStr() {
+  return new Date().toLocaleDateString('ja-JP')+' '+new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});
+}
+function _renderRecHtml(data) {
+  const pStyle = p => p==='high'?'background:#fef3c7;color:#92400e;border:1px solid #fde68a':p==='medium'?'background:#ede9fe;color:#5b21b6;border:1px solid #ddd6fe':'background:#f3f4f6;color:#6b7280;border:1px solid #e5e7eb';
+  const pLabel = p => p==='high'?'🔥 優先':p==='medium'?'✨ おすすめ':'💭 参考';
+  return data.categories.map(cat=>`
+    <div style="border:1px solid #e5e7eb;border-radius:10px;padding:12px;margin-bottom:8px;background:#fff">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
+        <span style="font-weight:700;font-size:14px;color:#1f2937">${esc(cat.category)}</span>
+        <span style="font-size:11px;padding:2px 8px;border-radius:20px;${pStyle(cat.priority)}">${pLabel(cat.priority)}</span>
+      </div>
+      <div style="font-size:13px;color:#374151;margin-bottom:4px">${esc(cat.reason)}</div>
+      <div style="font-size:12px;color:#6366f1;background:#eef2ff;border-radius:6px;padding:6px 10px">💡 ${esc(cat.scenario)}</div>
+    </div>`).join('')+`<div style="font-size:11px;color:#9ca3af;text-align:right;margin-top:2px">📅 ${esc(data.saved_at)}</div>`;
+}
+function _renderCheckHtml(ck) {
+  const vc = {excellent:'#16a34a',good:'#2563eb',neutral:'#d97706',poor:'#dc2626'}[ck.verdict]||'#6b7280';
+  const vb = {excellent:'#f0fdf4',good:'#eff6ff',neutral:'#fffbeb',poor:'#fef2f2'}[ck.verdict]||'#f9fafb';
+  const vBorder = {excellent:'#bbf7d0',good:'#bfdbfe',neutral:'#fde68a',poor:'#fecaca'}[ck.verdict]||'#e5e7eb';
+  return `<div style="border:1px solid ${vBorder};background:${vb};border-radius:10px;padding:14px;margin-bottom:8px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div><span style="font-weight:700;font-size:15px;color:#1f2937">「${esc(ck.category)}」との相性</span>
+        <div style="font-size:13px;color:${vc};font-weight:600;margin-top:2px">${esc(ck.summary||'')}</div></div>
+      <div style="text-align:center"><div style="font-size:28px;font-weight:800;color:${vc}">${ck.score}</div><div style="font-size:11px;color:#9ca3af">/ 100</div></div>
+    </div>
+    ${ck.reasons&&ck.reasons.length?`<div style="margin-bottom:8px"><div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:4px">✅ 合う理由</div>${ck.reasons.map(r=>`<div style="font-size:13px;color:#374151;padding:2px 0">・${esc(r)}</div>`).join('')}</div>`:''}
+    ${ck.concerns&&ck.concerns.length&&ck.concerns[0]?`<div style="margin-bottom:8px"><div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:4px">⚠️ 懸念点</div>${ck.concerns.map(r=>`<div style="font-size:13px;color:#6b7280;padding:2px 0">・${esc(r)}</div>`).join('')}</div>`:''}
+    ${ck.scenario?`<div style="font-size:12px;color:#6366f1;background:#eef2ff;border-radius:6px;padding:8px 10px;margin-top:4px">💡 ${esc(ck.scenario)}</div>`:''}
+    <div style="font-size:11px;color:#9ca3af;text-align:right;margin-top:4px">📅 ${esc(ck.saved_at)}</div>
+  </div>`;
+}
+function _renderMatchHtml(data) {
+  const sc = i=>i===0?'color:#7c3aed':i===1?'color:#4338ca':'color:#6b7280';
+  const cb = i=>i===0?'border:1px solid #c4b5fd;background:#f5f3ff':'border:1px solid #e5e7eb;background:#f9fafb';
+  return data.matches.map((m,i)=>`
+    <div style="${cb(i)};border-radius:12px;padding:16px;margin-bottom:12px;cursor:pointer" onclick="selectContact(${m.contact.id})">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span style="font-weight:700;color:#111827">${i+1}位: ${esc(m.contact.name)}</span>
+            ${m.contact.category?`<span style="font-size:11px;color:#fff;background:#6b7280;border-radius:20px;padding:2px 8px">${esc(m.contact.category)}</span>`:''}
+          </div>
+          ${m.contact.company?`<div style="font-size:12px;color:#9ca3af;margin-top:2px">${esc(m.contact.company)}</div>`:''}
+        </div>
+        <div style="text-align:center;flex-shrink:0"><div style="font-size:28px;font-weight:800;${sc(i)}">${m.score}</div><div style="font-size:11px;color:#9ca3af">/ 100</div></div>
+      </div>
+      <div style="margin-top:8px;font-size:13px;color:#374151">${esc(m.reason)}</div>
+      ${m.referral_opportunity?`<div style="margin-top:8px;font-size:12px;color:#4338ca;background:#eef2ff;border:1px solid #c7d2fe;border-radius:8px;padding:8px 10px">💡 ${esc(m.referral_opportunity)}</div>`:''}
+    </div>`).join('')+`<div style="font-size:11px;color:#9ca3af;text-align:right;margin-top:2px">📅 ${esc(data.saved_at)}</div>`;
 }
 
 async function runRecommendCategories(cid) {
@@ -1424,21 +1488,14 @@ async function runRecommendCategories(cid) {
     if (!res.categories || !res.categories.length) {
       el.innerHTML = '<div class="text-xs text-gray-400 text-center py-4">結果を取得できませんでした</div>'; return;
     }
-    const priorityStyle = p => p==='high' ? 'background:#fef3c7;color:#92400e;border:1px solid #fde68a' : p==='medium' ? 'background:#ede9fe;color:#5b21b6;border:1px solid #ddd6fe' : 'background:#f3f4f6;color:#6b7280;border:1px solid #e5e7eb';
-    const priorityLabel = p => p==='high' ? '🔥 優先' : p==='medium' ? '✨ おすすめ' : '💭 参考';
-    el.innerHTML = res.categories.map(cat => `
-      <div style="border:1px solid #e5e7eb;border-radius:10px;padding:12px;margin-bottom:8px;background:#fff">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
-          <span style="font-weight:700;font-size:14px;color:#1f2937">${esc(cat.category)}</span>
-          <span style="font-size:11px;padding:2px 8px;border-radius:20px;${priorityStyle(cat.priority)}">${priorityLabel(cat.priority)}</span>
-        </div>
-        <div style="font-size:13px;color:#374151;margin-bottom:4px">${esc(cat.reason)}</div>
-        <div style="font-size:12px;color:#6366f1;background:#eef2ff;border-radius:6px;padding:6px 10px">💡 ${esc(cat.scenario)}</div>
-      </div>`).join('');
+    const data = { categories: res.categories, saved_at: _nowStr() };
+    _mCache.recommend = data;
+    el.innerHTML = _renderRecHtml(data);
+    _saveMCache();
   } catch(e) {
     el.innerHTML = `<div style="color:#dc2626;font-size:13px">❌ ${esc(e.message)}</div>`;
   } finally {
-    btn.disabled = false; btn.textContent = '分析する';
+    btn.disabled = false; btn.textContent = '再分析';
   }
 }
 
@@ -1451,24 +1508,17 @@ async function runCheckCategory(cid) {
   el.innerHTML = '<div class="text-xs text-gray-400 text-center py-3">AIが判定中です...</div>';
   try {
     const res = await api('POST', '/contacts/'+cid+'/check-category', {category});
-    const verdictColor = {excellent:'#16a34a', good:'#2563eb', neutral:'#d97706', poor:'#dc2626'}[res.verdict] || '#6b7280';
-    const verdictBg = {excellent:'#f0fdf4', good:'#eff6ff', neutral:'#fffbeb', poor:'#fef2f2'}[res.verdict] || '#f9fafb';
-    const verdictBorder = {excellent:'#bbf7d0', good:'#bfdbfe', neutral:'#fde68a', poor:'#fecaca'}[res.verdict] || '#e5e7eb';
-    el.innerHTML = `
-      <div style="border:1px solid ${verdictBorder};background:${verdictBg};border-radius:10px;padding:14px">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-          <div>
-            <span style="font-weight:700;font-size:15px;color:#1f2937">「${esc(category)}」との相性</span>
-            <div style="font-size:13px;color:${verdictColor};font-weight:600;margin-top:2px">${esc(res.summary||'')}</div>
-          </div>
-          <div style="text-align:center">
-            <div style="font-size:28px;font-weight:800;color:${verdictColor}">${res.score}</div>
-            <div style="font-size:11px;color:#9ca3af">/ 100</div>
-          </div>
-        </div>
-        ${res.reasons && res.reasons.length ? `<div style="margin-bottom:8px"><div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:4px">✅ 合う理由</div>${res.reasons.map(r=>`<div style="font-size:13px;color:#374151;padding:2px 0">・${esc(r)}</div>`).join('')}</div>` : ''}
-        ${res.concerns && res.concerns.length && res.concerns[0] ? `<div style="margin-bottom:8px"><div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:4px">⚠️ 懸念点</div>${res.concerns.map(r=>`<div style="font-size:13px;color:#6b7280;padding:2px 0">・${esc(r)}</div>`).join('')}</div>` : ''}
-        ${res.scenario ? `<div style="font-size:12px;color:#6366f1;background:#eef2ff;border-radius:6px;padding:8px 10px;margin-top:4px">💡 ${esc(res.scenario)}</div>` : ''}
+    const ck = { ...res, category, saved_at: _nowStr() };
+    el.innerHTML = _renderCheckHtml(ck);
+    if (!_mCache.checks) _mCache.checks = [];
+    _mCache.checks = _mCache.checks.filter(c => c.category !== category);
+    _mCache.checks.push(ck);
+    _saveMCache();
+    const hist = document.getElementById('checkCatHistory');
+    if (hist) hist.innerHTML = `
+      <div style="margin-top:12px;border-top:1px solid #e5e7eb;padding-top:10px">
+        <div style="font-size:12px;font-weight:600;color:#6b7280;margin-bottom:8px">📋 過去のチェック履歴</div>
+        ${[..._mCache.checks].reverse().map(c=>_renderCheckHtml(c)).join('')}
       </div>`;
   } catch(e) {
     el.innerHTML = `<div style="color:#dc2626;font-size:13px">❌ ${esc(e.message)}</div>`;
@@ -1489,31 +1539,14 @@ async function runMatching(cid) {
       resultEl.innerHTML = '<div class="text-sm text-gray-400 text-center py-8">マッチング候補が見つかりませんでした。<br>コンタクトを2名以上登録すると分析できます。</div>';
       return;
     }
-    const scoreColor = i => i === 0 ? 'text-purple-600' : i === 1 ? 'text-indigo-600' : 'text-gray-600';
-    const cardBorder = i => i === 0 ? 'border-purple-300 bg-purple-50' : 'border-gray-200 bg-gray-50';
-    resultEl.innerHTML = res.matches.map((m, i) => `
-      <div class="border rounded-xl p-4 mb-3 ${cardBorder(i)} cursor-pointer hover:shadow-sm transition" onclick="selectContact(${m.contact.id})">
-        <div class="flex items-start justify-between gap-2">
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2 flex-wrap">
-              <span class="font-bold text-gray-900">${i+1}位: ${esc(m.contact.name)}</span>
-              ${m.contact.category ? `<span class="text-xs text-white bg-gray-500 rounded-full px-2 py-0.5">${esc(m.contact.category)}</span>` : ''}
-            </div>
-            ${m.contact.company ? `<div class="text-xs text-gray-400 mt-0.5">${esc(m.contact.company)}</div>` : ''}
-          </div>
-          <div class="text-right shrink-0">
-            <div class="text-2xl font-bold ${scoreColor(i)}">${m.score}</div>
-            <div class="text-xs text-gray-400">/ 100</div>
-          </div>
-        </div>
-        <div class="mt-2 text-sm text-gray-700">${esc(m.reason)}</div>
-        ${m.referral_opportunity ? `<div class="mt-2 text-xs text-indigo-700 bg-indigo-50 border border-blue-100 rounded-lg px-3 py-2">💡 ${esc(m.referral_opportunity)}</div>` : ''}
-        <div class="mt-2 text-xs text-gray-400 text-right">タップして詳細を表示 →</div>
-      </div>`).join('');
+    const data = { matches: res.matches, saved_at: _nowStr() };
+    _mCache.matching = data;
+    resultEl.innerHTML = _renderMatchHtml(data);
+    _saveMCache();
   } catch(e) {
     resultEl.innerHTML = `<div class="text-sm text-red-600 bg-red-50 rounded-lg p-3">❌ ${esc(e.message)}</div>`;
   } finally {
-    btn.innerHTML = '🤝 マッチング分析';
+    btn.innerHTML = '再分析';
     btn.disabled = false;
   }
 }
