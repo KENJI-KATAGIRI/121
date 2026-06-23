@@ -1542,6 +1542,62 @@ async def import_url(request: Request, url: str = Form(...)):
         raise HTTPException(500, detail=str(e))
 
 
+# ── WebページからコンタクトURL抽出 ───────────────────────────
+@app.post("/api/extract-contact-url")
+async def extract_contact_url(request: Request):
+    if not get_uid(request): raise HTTPException(401)
+    data = await request.json()
+    url = data.get("url", "").strip()
+    if not url or not url.startswith(("http://", "https://")):
+        raise HTTPException(400, detail="有効なURLを入力してください")
+    try:
+        async with httpx.AsyncClient(
+            follow_redirects=True, timeout=15,
+            headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Accept-Language": "ja,en;q=0.5",
+            }
+        ) as client:
+            r = await client.get(url)
+        if r.status_code != 200:
+            raise HTTPException(400, detail=f"ページの取得に失敗しました (HTTP {r.status_code})")
+
+        from html.parser import HTMLParser
+        import re as _re
+
+        class _TextExtractor(HTMLParser):
+            def __init__(self):
+                super().__init__()
+                self.texts = []
+                self._skip = False
+            def handle_starttag(self, tag, attrs):
+                if tag in ('script', 'style', 'noscript', 'head'):
+                    self._skip = True
+                if tag in ('p', 'div', 'br', 'li', 'h1', 'h2', 'h3', 'h4', 'tr', 'section'):
+                    self.texts.append('\n')
+            def handle_endtag(self, tag):
+                if tag in ('script', 'style', 'noscript', 'head'):
+                    self._skip = False
+            def handle_data(self, data):
+                if not self._skip:
+                    self.texts.append(data)
+
+        extractor = _TextExtractor()
+        extractor.feed(r.text)
+        text = _re.sub(r'\n{3,}', '\n\n', _re.sub(r'[ \t]+', ' ', ''.join(extractor.texts))).strip()
+
+        if len(text) < 50:
+            raise HTTPException(400, detail="ページからテキストを取得できませんでした。JavaScriptで動的生成されるページは非対応です。")
+
+        parsed = parse_with_ai(text)
+        return {"parsed": parsed}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, detail=str(e))
+
+
 # ── NiceMeet BNI連携 ─────────────────────────────────────
 @app.post("/api/nicemeet-contact")
 async def nicemeet_contact(request: Request):
@@ -1598,6 +1654,8 @@ async def nicemeet_webhook(request: Request):
     data = await request.json()
     conn = get_db()
     user = conn.execute("SELECT id FROM users WHERE username=?", (data.get("bni_user",""),)).fetchone()
+    if not user and data.get("bni_email"):
+        user = conn.execute("SELECT id FROM users WHERE email=? OR username=?", (data.get("bni_email",""), data.get("bni_email",""))).fetchone()
     if not user:
         conn.close()
         raise HTTPException(404, detail="user not found")
@@ -1607,6 +1665,13 @@ async def nicemeet_webhook(request: Request):
         c = conn.execute("SELECT id FROM contacts WHERE id=? AND user_id=?", (contact_id, uid)).fetchone()
         if not c:
             contact_id = None
+    if not contact_id and data.get("contact_name"):
+        name_match = conn.execute(
+            "SELECT id FROM contacts WHERE name=? AND user_id=?",
+            (data.get("contact_name",""), uid)
+        ).fetchone()
+        if name_match:
+            contact_id = name_match["id"]
     gains = data.get("gains", {})
     conn.execute("""
         INSERT INTO one_on_ones (user_id, contact_id, contact_name, duration_minutes, transcript, summary,

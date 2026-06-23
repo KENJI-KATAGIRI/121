@@ -503,6 +503,19 @@
     <div class="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
       <input type="hidden" id="editId">
 
+      <!-- URL抽出 -->
+      <div style="background:#f0f4ff;border:1px solid #c7d2fe;border-radius:10px;padding:12px 14px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <span style="font-size:14px">🔗</span>
+          <span style="font-size:13px;font-weight:600;color:#4338ca">web名刺・URLから自動入力</span>
+        </div>
+        <div style="display:flex;gap:8px">
+          <input id="url-extract-input" type="url" placeholder="https://..." style="flex:1;border:1px solid #c7d2fe;border-radius:8px;padding:7px 10px;font-size:13px;outline:none">
+          <button onclick="extractFromUrl()" id="url-extract-btn" style="padding:7px 14px;background:#4f46e5;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">抽出する</button>
+        </div>
+        <div id="url-extract-msg" style="font-size:12px;margin-top:6px;color:#6b7280"></div>
+      </div>
+
       <div class="grid grid-cols-2 gap-3">
         <div class="col-span-2">
           <label class="text-sm font-medium text-gray-700">名前 *</label>
@@ -1445,6 +1458,11 @@ async function saveIntro(cid) {
   if (idx>=0) contacts[idx].introduction = introduction;
 }
 
+function resetUrlExtract() {
+  document.getElementById('url-extract-input').value = '';
+  document.getElementById('url-extract-msg').textContent = '';
+}
+
 function openAddModal() {
   document.getElementById('modalTitle').textContent = '人物を追加';
   document.getElementById('editId').value = '';
@@ -1452,6 +1470,7 @@ function openAddModal() {
     const el = document.getElementById('f_'+f);
     if (el) el.value = '';
   });
+  resetUrlExtract();
   document.getElementById('modal').classList.remove('hidden');
 }
 
@@ -1463,11 +1482,44 @@ async function openEditModal(id) {
     const el = document.getElementById('f_'+f);
     if (el) el.value = c[f] || '';
   });
+  resetUrlExtract();
   document.getElementById('modal').classList.remove('hidden');
 }
 
 function closeModal() {
   document.getElementById('modal').classList.add('hidden');
+}
+
+async function extractFromUrl() {
+  const url = document.getElementById('url-extract-input').value.trim();
+  const msg = document.getElementById('url-extract-msg');
+  const btn = document.getElementById('url-extract-btn');
+  if (!url) { msg.style.color='#ef4444'; msg.textContent='URLを入力してください'; return; }
+  btn.disabled = true; btn.textContent = '取得中…'; msg.style.color='#6b7280'; msg.textContent='ページを読み込んでいます…';
+  try {
+    const res = await fetch('/api/extract-contact-url', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ url })
+    });
+    const data = await res.json();
+    if (!res.ok) { msg.style.color='#ef4444'; msg.textContent = data.detail || '取得に失敗しました'; return; }
+    const p = data.parsed || {};
+    const fields = ['name','reading','company','chapter','category','business_description','area','birthplace',
+      'residence','spouse','family','previous_jobs','hobbies','experience_years',
+      'success_key','selling_points','target_customers','referral_intro','request',
+      'goals','accomplishments','interests','networks','skills'];
+    let filled = 0;
+    fields.forEach(k => {
+      const el = document.getElementById('f_' + k);
+      if (el && p[k]) { el.value = p[k]; filled++; }
+    });
+    msg.style.color = '#16a34a';
+    msg.textContent = filled > 0 ? `✓ ${filled}項目を自動入力しました。内容を確認して保存してください。` : '情報を抽出できませんでした。';
+  } catch(e) {
+    msg.style.color='#ef4444'; msg.textContent = 'エラーが発生しました: ' + e.message;
+  } finally {
+    btn.disabled = false; btn.textContent = '抽出する';
+  }
 }
 
 async function saveContact() {
