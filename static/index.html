@@ -160,6 +160,23 @@
 </head>
 <body class="h-screen flex flex-col" style="background:#f8fafc">
 
+<!-- Session Expired Overlay -->
+<div id="sessionExpiredOverlay" class="fixed inset-0 items-center justify-center z-[200] hidden" style="background:rgba(15,23,42,0.85);backdrop-filter:blur(6px)">
+  <div class="rounded-2xl p-8 text-center" style="background:rgba(255,255,255,0.08);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.15);box-shadow:0 32px 64px rgba(0,0,0,0.5);max-width:320px;width:90%">
+    <div style="font-size:2.5rem;margin-bottom:12px">⏱️</div>
+    <h2 style="color:#fff;font-size:1.1rem;font-weight:700;margin-bottom:8px">セッションが切れました</h2>
+    <p style="color:rgba(255,255,255,0.6);font-size:0.85rem;margin-bottom:24px">ダッシュボードに戻って<br>BNI Managerを再度開いてください</p>
+    <a href="https://meet.gaiaarts.org/booking/dashboard.html"
+       style="display:block;background:linear-gradient(135deg,#6c63ff,#4f46e5);color:#fff;font-weight:700;padding:12px 20px;border-radius:10px;text-decoration:none;font-size:0.95rem;margin-bottom:12px">
+      ダッシュボードへ戻る
+    </a>
+    <button onclick="document.getElementById('sessionExpiredOverlay').classList.add('hidden');document.getElementById('sessionExpiredOverlay').classList.remove('flex');location.reload();"
+       style="background:transparent;color:rgba(255,255,255,0.4);font-size:0.8rem;border:none;cursor:pointer;text-decoration:underline">
+      パスワードでログインする
+    </button>
+  </div>
+</div>
+
 <!-- Login Screen -->
 <div id="loginScreen" class="fixed inset-0 flex items-center justify-center z-[100]" style="background:linear-gradient(135deg,#0f172a 0%,#1e1b4b 50%,#0f172a 100%)">
   <div class="rounded-2xl p-8 w-80" style="background:rgba(255,255,255,0.06);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.15);box-shadow:0 32px 64px rgba(0,0,0,0.5)">
@@ -982,7 +999,12 @@ async function api(method, path, body) {
   const opts = { method, headers: {'Content-Type':'application/json', 'Authorization': authToken} };
   if (body) opts.body = JSON.stringify(body);
   const r = await fetch(BASE + 'api' + path, opts);
-  if (r.status === 401) { location.reload(); return; }
+  if (r.status === 401) {
+    const ov = document.getElementById('sessionExpiredOverlay');
+    if (ov) { ov.classList.remove('hidden'); ov.classList.add('flex'); }
+    else { location.reload(); }
+    return;
+  }
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }
