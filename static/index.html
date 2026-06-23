@@ -1450,12 +1450,24 @@ async function generateIntro(cid) {
 }
 
 async function saveIntro(cid) {
+  const btn = event.currentTarget;
   const introduction = document.getElementById('introText').value;
-  const c = await api('GET', '/contacts/'+cid);
-  await api('PUT', '/contacts/'+cid, {...c, introduction});
-  // Update local cache
-  const idx = contacts.findIndex(x=>x.id===cid);
-  if (idx>=0) contacts[idx].introduction = introduction;
+  const origText = btn.textContent;
+  btn.disabled = true; btn.textContent = '保存中…';
+  try {
+    const c = await api('GET', '/contacts/'+cid);
+    await api('PUT', '/contacts/'+cid, {...c, introduction});
+    const idx = contacts.findIndex(x=>x.id===cid);
+    if (idx>=0) contacts[idx].introduction = introduction;
+    btn.textContent = '✓ 保存しました';
+    btn.style.background = '#16a34a';
+    setTimeout(() => { btn.textContent = origText; btn.style.background = ''; btn.disabled = false; }, 2000);
+  } catch(e) {
+    btn.textContent = '保存失敗';
+    btn.style.background = '#dc2626';
+    setTimeout(() => { btn.textContent = origText; btn.style.background = ''; btn.disabled = false; }, 2000);
+    alert('保存に失敗しました: ' + e.message);
+  }
 }
 
 function resetUrlExtract() {
