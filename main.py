@@ -1866,9 +1866,13 @@ async def nicemeet_webhook(request: Request):
         raise HTTPException(403, detail="forbidden")
     data = await request.json()
     conn = get_db()
-    user = conn.execute("SELECT id FROM users WHERE username=?", (data.get("bni_user",""),)).fetchone()
-    if not user and data.get("bni_email"):
-        user = conn.execute("SELECT id FROM users WHERE email=? OR username=?", (data.get("bni_email",""), data.get("bni_email",""))).fetchone()
+    # メールアドレスで優先検索（名前は変わることがあるため）
+    if data.get("bni_email"):
+        user = conn.execute("SELECT id FROM users WHERE email=?", (data.get("bni_email",""),)).fetchone()
+    else:
+        user = None
+    if not user:
+        user = conn.execute("SELECT id FROM users WHERE username=?", (data.get("bni_user",""),)).fetchone()
     if not user:
         conn.close()
         raise HTTPException(404, detail="user not found")

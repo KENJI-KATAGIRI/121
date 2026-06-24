@@ -143,6 +143,18 @@
       <div><label class="text-xs font-semibold text-gray-500">ターゲット顧客</label><textarea id="mp_target_customers" rows="3" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></textarea></div>
       <div><label class="text-xs font-semibold text-gray-500">紹介の切り出し方</label><textarea id="mp_referral_intro" rows="3" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></textarea></div>
       <hr>
+      <div>
+        <p class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">自分のGAINS（AI記録の除外用）</p>
+        <p class="text-xs text-gray-400 mb-3">1-2-1のAI文字起こし時、ここに登録した情報は「自分のGAINS」として除外され、相手のGAINSだけが正確に記録されます。</p>
+        <div class="space-y-3">
+          <div><label class="text-sm font-medium text-gray-700">目標 (Goals)</label><textarea id="mp_gains_goals" rows="2" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></textarea></div>
+          <div><label class="text-sm font-medium text-gray-700">実績 (Accomplishments)</label><textarea id="mp_gains_accomplishments" rows="2" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></textarea></div>
+          <div><label class="text-sm font-medium text-gray-700">興味関心 (Interests)</label><textarea id="mp_gains_interests" rows="2" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></textarea></div>
+          <div><label class="text-sm font-medium text-gray-700">人脈 (Networks)</label><textarea id="mp_gains_networks" rows="2" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></textarea></div>
+          <div><label class="text-sm font-medium text-gray-700">スキル (Skills)</label><textarea id="mp_gains_skills" rows="2" class="mt-1 w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></textarea></div>
+        </div>
+      </div>
+      <hr>
       <div class="flex items-center gap-3">
         <div class="flex-1"><label class="text-xs font-semibold text-gray-500">公開URL スラッグ</label><div class="flex items-center gap-1 mt-1"><span class="text-xs text-gray-400">/bni/profile/</span><input id="mp_slug" type="text" placeholder="my-name" class="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"></div></div>
         <div class="pt-5"><label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" id="mp_public" class="w-4 h-4 accent-blue-600"><span class="text-sm text-gray-700">公開する</span></label></div>
@@ -506,7 +518,7 @@ async function loadSuggestions() {
 }
 
 // ── マイプロフィール ───────────────────────────────────────
-const MP_FIELDS = ['name','company','chapter','category','business_description','selling_points','target_customers','referral_intro'];
+const MP_FIELDS = ['name','company','chapter','category','business_description','selling_points','target_customers','referral_intro','gains_goals','gains_accomplishments','gains_interests','gains_networks','gains_skills'];
 
 async function loadMyProfile() {
   const p = await api('GET', '/my-profile');
